@@ -45,5 +45,14 @@
     <ClInclude Include="Networking\Connection\Server_connection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Networking\Interfaces\Client_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Networking\Interfaces\Server_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Networking\Interfaces\Client_connection_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

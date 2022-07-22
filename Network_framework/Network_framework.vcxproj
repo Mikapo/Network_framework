@@ -139,6 +139,9 @@
   <ItemGroup>
     <ClInclude Include="Networking\Connection\Client_connection.h" />
     <ClInclude Include="Networking\Connection\Server_connection.h" />
+    <ClInclude Include="Networking\Interfaces\Client_connection_interface.h" />
+    <ClInclude Include="Networking\Interfaces\Client_interface.h" />
+    <ClInclude Include="Networking\Interfaces\Server_interface.h" />
     <ClInclude Include="Networking\Net_framework.h" />
     <ClInclude Include="Networking\Net_user\Client.h" />
     <ClInclude Include="Networking\Utility\Net_common.h" />

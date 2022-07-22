@@ -9,7 +9,7 @@ enum class Message_id : uint8_t
 	server_message
 };
 
-class Chat_client : public Network::Client<Message_id>
+class Chat_client : public Network::Client_interface<Message_id>
 {
 private:
 	void on_message(Network::Net_message<Message_id>& message) override

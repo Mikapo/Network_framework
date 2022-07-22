@@ -10,22 +10,22 @@ enum class Message_id : uint8_t
 	server_message
 };
 
-class Chat_server : public Network::Server<Message_id, 12>
+class Chat_server : public Network::Server_interface<Message_id>
 {
 public:
 	Chat_server(uint16_t port)
-		: Server<Message_id, 12>(port) {}
+		: Server_interface<Message_id>(port) {}
 
 private:
 
-	void on_message(std::shared_ptr<Network::Client_connection<Message_id, 12>> client, Network::Net_message<Message_id>& message) override
+	void on_message(Network::Client_connection_interface<Message_id> client, Network::Net_message<Message_id>& message) override
 	{
 		switch (message.m_header.m_id)
 		{
 		case Message_id::set_name:
 		{
 			const std::string name = get_string_from_message(message);
-			m_names[client->get_id()] = name;
+			m_names[client.get_id()] = name;
 			
 			Network::Net_message<Message_id> net_message;
 			net_message.m_header.m_id = Message_id::server_message;
@@ -41,11 +41,11 @@ private:
 		}
 		case Message_id::message:
 		{
-			auto found_name = m_names.find(client->get_id());
+			auto found_name = m_names.find(client.get_id());
 
 			if (found_name == m_names.end())
 			{
-				client->disconnect();
+				client.disconnect();
 				break;
 			}
 
@@ -60,7 +60,7 @@ private:
 
 			std::cout << output_string << "\n";
 
-			send_message_to_all_clients(net_message);
+			send_message_to_client(client, net_message);
 			break;
 		}
 		default:

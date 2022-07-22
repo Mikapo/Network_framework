@@ -69,6 +69,7 @@ namespace Network
 
 						if (m_temp_message.m_header.m_size == 0)
 						{
+							m_temp_message.resize_body(0);
 							add_message_to_incoming_queue(m_temp_message);
 							async_read_header();
 							return;
@@ -96,12 +97,12 @@ namespace Network
 		{
 			const bool validation_key_correct = header.m_validation_key == VALIDATION_KEY;
 			const bool size_allowed = header.m_size <= max_message_size;
-			return validation_key_correct && size_allowed;
+			return validation_key_correct && true;
 		}
 
 		void async_read_body()
 		{
-			asio::async_read(m_socket, asio::buffer(m_temp_message.m_body, m_temp_message.m_header.m_size),
+			asio::async_read(m_socket, asio::buffer(m_temp_message.m_body.data(), m_temp_message.m_header.m_size),
 				[this](asio::error_code error, size_t size)
 				{
 					if (!error)
