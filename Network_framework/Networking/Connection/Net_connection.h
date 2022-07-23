@@ -6,9 +6,9 @@
 #include <memory>
 #include <functional>
 
-namespace Network
+namespace Net
 {
-	template<Enum_concept Id_enum_type, size_t max_message_size>
+	template<Id_concept Id_type, size_t max_message_size>
 	class Net_connection
 	{
 	public:
@@ -37,7 +37,7 @@ namespace Network
 			return m_socket.is_open();
 		}
 
-		bool send_message(const Net_message<Id_enum_type>& message)
+		bool send_message(const Net_message<Id_type>& message)
 		{
 			asio::post(m_io_context,
 				[this, message]
@@ -56,7 +56,7 @@ namespace Network
 	protected:
 		void async_read_header()
 		{
-			asio::async_read(m_socket, asio::buffer(&m_temp_message.m_header, sizeof(Net_message_header<Id_enum_type>)),
+			asio::async_read(m_socket, asio::buffer(&m_temp_message.m_header, sizeof(Net_message_header<Id_type>)),
 				[this](asio::error_code error, size_t size)
 				{
 					if (!error)
@@ -93,7 +93,7 @@ namespace Network
 				m_socket.close();
 		}
 
-		bool validate_header(Net_message_header<Id_enum_type> header)
+		bool validate_header(Net_message_header<Id_type> header)
 		{
 			const bool validation_key_correct = header.m_validation_key == VALIDATION_KEY;
 			const bool size_allowed = header.m_size <= max_message_size;
@@ -102,7 +102,7 @@ namespace Network
 
 		void async_read_body()
 		{
-			asio::async_read(m_socket, asio::buffer(m_temp_message.m_body.data(), m_temp_message.m_header.m_size),
+			asio::async_read(m_socket, asio::buffer(m_temp_message.m_body.data(), m_temp_message.m_body.size()),
 				[this](asio::error_code error, size_t size)
 				{
 					if (!error)
@@ -117,7 +117,7 @@ namespace Network
 
 		void async_write_header()
 		{
-			asio::async_write(m_socket, asio::buffer(&m_out_queue.front().m_header, sizeof(Net_message_header<Id_enum_type>)), 
+			asio::async_write(m_socket, asio::buffer(&m_out_queue.front().m_header, sizeof(Net_message_header<Id_type>)), 
 				[this](asio::error_code error, size_t size)
 				{
 					if (!error)
@@ -154,9 +154,9 @@ namespace Network
 				});
 		}
 
-		virtual void add_message_to_incoming_queue(const Net_message<Id_enum_type>& message) = 0;
+		virtual void add_message_to_incoming_queue(const Net_message<Id_type>& message) = 0;
 
-		Net_message<Id_enum_type> m_temp_message;
-		Thread_safe_deque<Net_message<Id_enum_type>> m_out_queue;
+		Net_message<Id_type> m_temp_message;
+		Thread_safe_deque<Net_message<Id_type>> m_out_queue;
 	};
 }

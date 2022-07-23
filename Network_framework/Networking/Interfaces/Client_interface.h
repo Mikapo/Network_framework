@@ -2,13 +2,13 @@
 
 #include "../Net_user/Client.h"
 
-namespace Network
+namespace Net
 {
-	template<Enum_concept Id_enum_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
-	class Client_interface : private Client<Id_enum_type, max_message_size>
+	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
+	class Client_interface : private Client<Id_type, max_message_size>
 	{
 	public:
-		using Underlying = Client<Id_enum_type, max_message_size>;
+		using Underlying = Client<Id_type, max_message_size>;
 
 		bool connect(std::string_view host, uint16_t port)
 		{
@@ -25,7 +25,7 @@ namespace Network
 			return this->Underlying::is_connected();
 		}
 
-		void send_message(const Net_message<Id_enum_type>& message)
+		void send_message(const Net_message<Id_type>& message)
 		{
 			this->Underlying::send_message(message);
 		}
@@ -35,6 +35,6 @@ namespace Network
 			this->Underlying::handle_received_messages(max_messages);
 		}
 
-		void on_message(Net_message<Id_enum_type>& message) = 0;
+		void on_message(Net_message<Id_type>& message) = 0;
 	};
 }

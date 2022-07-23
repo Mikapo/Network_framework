@@ -3,13 +3,13 @@
 
 #include "Net_connection.h"
 
-namespace Network
+namespace Net
 {
-	template<Enum_concept Id_enum_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
-	class Server_connection : public Net_connection<Id_enum_type, max_message_size>
+	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
+	class Server_connection : public Net_connection<Id_type, max_message_size>
 	{
 	public:
-		using Net_connection = Net_connection<Id_enum_type, max_message_size>;
+		using Net_connection = Net_connection<Id_type, max_message_size>;
 		using Protocol = asio::ip::tcp;
 
 		Server_connection(asio::io_context& io_context, Net_connection::Socket_type socket)
@@ -35,12 +35,12 @@ namespace Network
 		}
 
 	private:
-		void add_message_to_incoming_queue(const Net_message<Id_enum_type>& message) override
+		void add_message_to_incoming_queue(const Net_message<Id_type>& message) override
 		{
 			this->m_on_message_received_callback(message);
 			this->async_read_header();
 		}
 
-		std::function<void(const Net_message<Id_enum_type>&)> m_on_message_received_callback;
+		std::function<void(const Net_message<Id_type>&)> m_on_message_received_callback;
 	};
 }

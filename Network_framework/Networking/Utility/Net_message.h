@@ -9,13 +9,13 @@
 #include "gsl/span"
 #include "gsl/gsl"
 
-namespace Network
+namespace Net
 {
-	template<Enum_concept Id_enum_type>
+	template<Id_concept Id_type>
 	struct Net_message_header
 	{
 		const uint64_t m_validation_key = VALIDATION_KEY;
-		Id_enum_type m_id = {};
+		Id_type m_id = {};
 		uint32_t m_size = 0;
 
 
@@ -30,12 +30,12 @@ namespace Network
 		}
 	};
 
-	template<Enum_concept Id_enum_type>
+	template<Id_concept Id_type>
 	struct Net_message
 	{
 		friend std::ostream& operator<<(std::ostream& stream, const Net_message& message)
 		{
-			stream << "ID: " << static_cast<std::underlying_type_t<Id_enum_type>>(message.m_header.m_id) << " Size: " << message.m_header.m_size;
+			stream << "ID: " << static_cast<std::underlying_type_t<Id_type>>(message.m_header.m_id) << " Size: " << message.m_header.m_size;
 			return stream;
 		}
 
@@ -107,17 +107,17 @@ namespace Network
 			return sizeof(m_header) + m_body.size();
 		}
 
-		Net_message_header<Id_enum_type> m_header;
+		Net_message_header<Id_type> m_header;
 		std::vector<char> m_body = {};
 	};
 
-	template<Enum_concept Id_enum_type, uint64_t max_message_size>
+	template<Id_concept Id_type, uint64_t max_message_size>
 	class Client_connection;
 
-	template<Enum_concept Id_enum_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
+	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
 	struct Owned_message
 	{
-		using Client_connection_ptr = std::shared_ptr<Client_connection<Id_enum_type, max_message_size>>;
+		using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type, max_message_size>>;
 
 		friend std::ostream& operator<<(std::ostream& stream, const Owned_message& message)
 		{
@@ -135,7 +135,7 @@ namespace Network
 		}
 
 		Client_connection_ptr m_owner = nullptr;
-		Net_message<Id_enum_type> m_message;
+		Net_message<Id_type> m_message;
 	};
 
 };

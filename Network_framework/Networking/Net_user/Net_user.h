@@ -4,13 +4,13 @@
 #include "../Utility/Thread_safe_deque.h"
 #include <thread>
 
-namespace Network
+namespace Net
 {
-	template<Enum_concept Id_enum_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
+	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
 	class Net_user
 	{
 	public:
-		using Owned_message = Owned_message<Id_enum_type, max_message_size>;
+		using Owned_message = Owned_message<Id_type, max_message_size>;
 
 	protected:
 		virtual void on_notification(std::string_view notification, Severity severity = Severity::notification)

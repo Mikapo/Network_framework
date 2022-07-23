@@ -6,13 +6,13 @@
 #include <memory>
 #include <cstdint>
 
-namespace Network
+namespace Net
 {
-	template<Enum_concept Id_enum_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
-	class Client : public Net_user<Id_enum_type, max_message_size>
+	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
+	class Client : public Net_user<Id_type, max_message_size>
 	{
 	public:
-		using Server_connection = Server_connection<Id_enum_type, max_message_size>;
+		using Server_connection = Server_connection<Id_type, max_message_size>;
 		using Server_connection_ptr = std::unique_ptr<Server_connection>;
 		using Protocol = asio::ip::tcp;
 
@@ -39,7 +39,7 @@ namespace Network
 					Protocol::socket(this->m_asio_context));
 
 				m_connection->set_on_message_received_callback(
-					[this](const Net_message<Id_enum_type>& message)
+					[this](const Net_message<Id_type>& message)
 					{
 						on_message_received(message);
 					});
@@ -78,7 +78,7 @@ namespace Network
 				return false;
 		}
 
-		void send_message(const Net_message<Id_enum_type>& message)
+		void send_message(const Net_message<Id_type>& message)
 		{
 			if (is_connected())
 				m_connection->send_message(message);
@@ -94,15 +94,15 @@ namespace Network
 		}
 
 	protected:
-		virtual void on_message(Net_message<Id_enum_type>& message)
+		virtual void on_message(Net_message<Id_type>& message)
 		{
 
 		}
 
 	private:
-		void on_message_received(const Net_message<Id_enum_type>& message)
+		void on_message_received(const Net_message<Id_type>& message)
 		{
-			Owned_message<Id_enum_type, max_message_size> owned_message = { .m_owner = nullptr, .m_message = message };
+			Owned_message<Id_type, max_message_size> owned_message = { .m_owner = nullptr, .m_message = message };
 			this->m_in_queue.push_back(std::move(owned_message));
 		}
 

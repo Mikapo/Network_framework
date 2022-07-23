@@ -4,15 +4,15 @@
 
 enum class Message_id : uint8_t
 {
-	set_name,
-	message,
-	server_message
+	set_name = 0,
+	message = 1,
+	server_message = 2
 };
 
-class Chat_client : public Network::Client_interface<Message_id>
+class Chat_client : public Net::Client_interface<Message_id>
 {
 private:
-	void on_message(Network::Net_message<Message_id>& message) override
+	void on_message(Net::Net_message<Message_id>& message) override
 	{
 		switch (message.m_header.m_id)
 		{
@@ -29,7 +29,7 @@ private:
 
 	}
 
-	std::string get_string_from_message(const Network::Net_message<Message_id>& message)
+	std::string get_string_from_message(const Net::Net_message<Message_id>& message)
 	{
 		std::string output;
 		for (size_t i = 0; i < message.m_body.size(); ++i)
@@ -40,7 +40,7 @@ private:
 
 
 bool send_thread_exit_flag = false;
-Network::Thread_safe_deque<Network::Net_message<Message_id>> messages;
+Net::Thread_safe_deque<Net::Net_message<Message_id>> messages;
 
 void send_thread()
 {
@@ -49,7 +49,7 @@ void send_thread()
 		std::string message;
 		std::getline(std::cin, message);
 
-		Network::Net_message<Message_id> net_message;
+		Net::Net_message<Message_id> net_message;
 		net_message.m_header.m_id = Message_id::message;
 
 		for (size_t i = 0; i < message.size(); ++i)
@@ -65,7 +65,7 @@ void send_name(Chat_client& client)
 	std::string username;
 	std::getline(std::cin, username);
 
-	Network::Net_message<Message_id> message;
+	Net::Net_message<Message_id> message;
 	message.m_header.m_id = Message_id::set_name;
 
 	for (size_t i = 0; i < username.size(); ++i)
@@ -122,7 +122,9 @@ int main()
 		return 1;
 	}
 
-	std::cout << "Server disconnected \n";
+	std::cout << "Lost connection to server \n";
+	std::cout << "Press enter to exit... \n";
+	std::cin.get();
 }
 
 

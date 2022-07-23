@@ -3,7 +3,7 @@
 #include <deque>
 #include <mutex>
 
-namespace Network
+namespace Net
 {
 	template<typename T>
 	class Thread_safe_deque

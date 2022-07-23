@@ -11,10 +11,10 @@
 #include "asio/buffer.hpp"
 #include "asio/socket_base.hpp"
 
-namespace Network
+namespace Net
 {
 	template<typename T>
-	concept Enum_concept = std::is_enum_v<T>;
+	concept Id_concept = std::is_enum_v<T> && std::is_unsigned_v<std::underlying_type_t<T>>;
 
 	enum class Severity : uint8_t
 	{

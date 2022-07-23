@@ -9,13 +9,13 @@
 #include <limits>
 #include <format>
 
-namespace Network
+namespace Net
 {
-	template<Enum_concept Id_enum_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
-	class Server : public Net_user<Id_enum_type, max_message_size>
+	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
+	class Server : public Net_user<Id_type, max_message_size>
 	{
 	public:
-		using Client_connection = Client_connection<Id_enum_type, max_message_size>;
+		using Client_connection = Client_connection<Id_type, max_message_size>;
 		using Client_connection_ptr = std::shared_ptr<Client_connection>;
 		using Protocol = asio::ip::tcp;
 		
@@ -73,7 +73,7 @@ namespace Network
 							m_connections.back()->connect_to_client(m_id_counter++);
 
 							m_connections.back()->set_on_message_received_callback(
-								[this](const Net_message<Id_enum_type>& message, Client_connection_ptr connection)
+								[this](const Net_message<Id_type>& message, Client_connection_ptr connection)
 								{
 									on_message_received(message, connection);
 								});
@@ -93,7 +93,7 @@ namespace Network
 				});
 		}
 
-		void send_message_to_client(Client_connection_ptr client, const Net_message<Id_enum_type>& message)
+		void send_message_to_client(Client_connection_ptr client, const Net_message<Id_type>& message)
 		{
 			if (client && client->is_connected())
 				client->send_message(message);
@@ -106,7 +106,7 @@ namespace Network
 			}
 		}
 
-		void send_message_to_all_clients(const Net_message<Id_enum_type>& message, Client_connection_ptr ignored_client = nullptr)
+		void send_message_to_all_clients(const Net_message<Id_type>& message, Client_connection_ptr ignored_client = nullptr)
 		{
 			bool disconnected_clients_exist = false;
 
@@ -151,15 +151,15 @@ namespace Network
 
 		}
 
-		virtual void on_message(Client_connection_ptr client, Net_message<Id_enum_type>& message)
+		virtual void on_message(Client_connection_ptr client, Net_message<Id_type>& message)
 		{
 
 		}
 
 	private:
-		void on_message_received(const Net_message<Id_enum_type>& message, Client_connection_ptr connection)
+		void on_message_received(const Net_message<Id_type>& message, Client_connection_ptr connection)
 		{
-			Owned_message<Id_enum_type, max_message_size> owned_message = { .m_owner = connection, .m_message = message };
+			Owned_message<Id_type, max_message_size> owned_message = { .m_owner = connection, .m_message = message };
 			this->m_in_queue.push_back(std::move(owned_message));
 		}
 
