@@ -11,11 +11,11 @@
 
 namespace Net
 {
-	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
-	class Server : public Net_user<Id_type, max_message_size>
+	template<Id_concept Id_type>
+	class Server : public Net_user<Id_type>
 	{
 	public:
-		using Client_connection = Client_connection<Id_type, max_message_size>;
+		using Client_connection = Client_connection<Id_type>;
 		using Client_connection_ptr = std::shared_ptr<Client_connection>;
 		using Protocol = asio::ip::tcp;
 		
@@ -78,7 +78,7 @@ namespace Net
 									on_message_received(message, connection);
 								});
 
-							this->on_notification("Server connection approved");
+							this->on_notification(std::format("Client with id {} was accepted", m_connections.back()->get_id()));
 						}
 						else
 						{
@@ -96,11 +96,10 @@ namespace Net
 		void send_message_to_client(Client_connection_ptr client, const Net_message<Id_type>& message)
 		{
 			if (client && client->is_connected())
-				client->send_message(message);
+				client->async_send_message(message);
 			else
 			{
-				this->on_notification("Client disconnected");
-				on_client_disconnect(client);
+				notify_client_disconnect(client);
 				client.reset();
 				m_connections.erase(std::remove(m_connections.begin(), m_connections.end(), client), m_connections.end());
 			}
@@ -115,19 +114,17 @@ namespace Net
 				if (client && client->is_connected())
 				{
 					if (client != ignored_client)
-						client->send_message(message);
+						client->async_send_message(message);
 				}
 				else
 				{
-					this->on_notification("Client disconnected");
-					on_client_disconnect(client);
+					notify_client_disconnect(client);
 					client.reset();
 					disconnected_clients_exist = true;
 				}
 
 				if (disconnected_clients_exist)
 					m_connections.erase(std::remove(m_connections.begin(), m_connections.end(), nullptr), m_connections.end());
-				
 			}
 		}
 
@@ -157,9 +154,15 @@ namespace Net
 		}
 
 	private:
+		void notify_client_disconnect(Client_connection_ptr client)
+		{
+			this->on_notification(std::format("Client disconnected"));
+			on_client_disconnect(client);
+		}
+
 		void on_message_received(const Net_message<Id_type>& message, Client_connection_ptr connection)
 		{
-			Owned_message<Id_type, max_message_size> owned_message = { .m_owner = connection, .m_message = message };
+			Owned_message<Id_type> owned_message = { .m_owner = connection, .m_message = message };
 			this->m_in_queue.push_back(std::move(owned_message));
 		}
 

@@ -111,13 +111,13 @@ namespace Net
 		std::vector<char> m_body = {};
 	};
 
-	template<Id_concept Id_type, uint64_t max_message_size>
+	template<Id_concept Id_type>
 	class Client_connection;
 
-	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
+	template<Id_concept Id_type>
 	struct Owned_message
 	{
-		using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type, max_message_size>>;
+		using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
 
 		friend std::ostream& operator<<(std::ostream& stream, const Owned_message& message)
 		{

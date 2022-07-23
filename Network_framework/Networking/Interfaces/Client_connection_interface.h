@@ -4,15 +4,15 @@
 
 namespace Net
 {
-	template<Id_concept Id_type, uint64_t max_message_size>
+	template<Id_concept Id_type>
 	class Server_interface;
 
-	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
+	template<Id_concept Id_type>
 	class Client_connection_interface
 	{
 	public:
-		friend Server_interface<Id_type, max_message_size>;
-		using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type, max_message_size>>;
+		friend Server_interface<Id_type>;
+		using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
 
 		Client_connection_interface(Client_connection_ptr ptr)
 			: m_client_connection(ptr) {}

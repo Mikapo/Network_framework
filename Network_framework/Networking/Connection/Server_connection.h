@@ -5,11 +5,11 @@
 
 namespace Net
 {
-	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
-	class Server_connection : public Net_connection<Id_type, max_message_size>
+	template<Id_concept Id_type>
+	class Server_connection : public Net_connection<Id_type>
 	{
 	public:
-		using Net_connection = Net_connection<Id_type, max_message_size>;
+		using Net_connection = Net_connection<Id_type>;
 		using Protocol = asio::ip::tcp;
 
 		Server_connection(asio::io_context& io_context, Net_connection::Socket_type socket)

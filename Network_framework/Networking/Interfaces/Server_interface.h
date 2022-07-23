@@ -5,11 +5,11 @@
 
 namespace Net
 {
-	template<Id_concept Id_type, uint64_t max_message_size = std::numeric_limits<uint64_t>::max()>
-	class Server_interface : Server<Id_type, max_message_size>
+	template<Id_concept Id_type>
+	class Server_interface : Server<Id_type>
 	{
 	public:
-		using Underlying = Server<Id_type, max_message_size>;
+		using Underlying = Server<Id_type>;
 
 		Server_interface(uint16_t port)
 			: Underlying(port) {}
@@ -24,13 +24,13 @@ namespace Net
 			this->Underlying::stop();
 		}
 
-		void send_message_to_client(Client_connection_interface<Id_type, max_message_size> client, const Net_message<Id_type>& message)
+		void send_message_to_client(Client_connection_interface<Id_type> client, const Net_message<Id_type>& message)
 		{
 			this->Underlying::send_message_to_client(client.get_underlying(), message);
 		}
 
 		void send_message_to_all_clients(const Net_message<Id_type>& message, 
-			Client_connection_interface<Id_type, max_message_size> ignored_client = Client_connection_interface<Id_type, max_message_size>(nullptr))
+			Client_connection_interface<Id_type> ignored_client = Client_connection_interface<Id_type>(nullptr))
 		{
 			this->Underlying::send_message_to_all_clients(message, ignored_client.get_underlying());
 		}
@@ -40,17 +40,17 @@ namespace Net
 			this->Underlying::handle_received_messages(max_messages);
 		}
 		
-		virtual bool on_client_connect(Client_connection_interface<Id_type, max_message_size> client)
+		virtual bool on_client_connect(Client_connection_interface<Id_type> client)
 		{
 			return true;
 		}
 
-		virtual void on_client_disconnect(Client_connection_interface<Id_type, max_message_size> client)
+		virtual void on_client_disconnect(Client_connection_interface<Id_type> client)
 		{
 
 		}
 
-		virtual void on_message(Client_connection_interface<Id_type, max_message_size> client, Net_message<Id_type>& message)
+		virtual void on_message(Client_connection_interface<Id_type> client, Net_message<Id_type>& message)
 		{
 
 		}
@@ -63,17 +63,17 @@ namespace Net
 	private:
 		bool on_client_connect(Underlying::Client_connection_ptr client)
 		{
-			return on_client_connect(Client_connection_interface<Id_type, max_message_size>(client));
+			return on_client_connect(Client_connection_interface<Id_type>(client));
 		}
 
 		void on_client_disconnect(Underlying::Client_connection_ptr client)
 		{
-			on_client_connect(Client_connection_interface<Id_type, max_message_size>(client));
+			on_client_connect(Client_connection_interface<Id_type>(client));
 		}
 
 		void on_message(Underlying::Client_connection_ptr client, Net_message<Id_type>& message)
 		{
-			on_message(Client_connection_interface<Id_type, max_message_size>(client), message);
+			on_message(Client_connection_interface<Id_type>(client), message);
 		}
 
 	};

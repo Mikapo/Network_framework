@@ -26,6 +26,8 @@ private:
 		{
 			const std::string name = get_string_from_message(message);
 			m_names[client.get_id()] = name;
+
+			std::cout << "Set name " << name << " for client " << client.get_id() << "\n";
 			
 			Net::Net_message<Message_id> net_message;
 			net_message.m_header.m_id = Message_id::server_message;
