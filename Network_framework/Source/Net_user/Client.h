@@ -14,7 +14,6 @@ namespace Net
     public:
         using Server_connection = Server_connection<Id_type>;
         using Server_connection_ptr = std::unique_ptr<Server_connection>;
-        using Protocol = asio::ip::tcp;
 
         Client() : m_socket(this->m_asio_context)
         {

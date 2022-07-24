@@ -13,10 +13,7 @@ namespace Net
     class Net_connection
     {
     public:
-        using Protocol_type = asio::ip::tcp;
-        using Socket_type = Protocol_type::socket;
-
-        Net_connection(asio::io_context& io_context, Socket_type socket)
+        Net_connection(asio::io_context& io_context, Protocol::socket socket)
             : m_socket(std::move(socket)), m_io_context(io_context)
         {
         }
@@ -53,18 +50,21 @@ namespace Net
     protected:
         void async_read_header()
         {
+            m_temp_message.m_header.m_validation_key = 0;
+
             asio::async_read(
                 m_socket, asio::buffer(&m_temp_message.m_header, sizeof(Net_message_header<Id_type>)),
                 [this](asio::error_code error, size_t size) {
                     if (!error)
                     {
-                        std::cout << "reading header validation: " << m_temp_message.m_header.m_validation_key
+                        std::cout << "reading header | validation: " << m_temp_message.m_header.m_validation_key
                                   << " size: " << m_temp_message.m_header.m_size
-                                  << " header bytes: " << sizeof(Net_message_header<Id_type>) << "\n";
+                                  << " id: " << static_cast<uint32_t>(m_temp_message.m_header.m_id) << "\n";
 
                         if (!validate_header(m_temp_message.m_header))
                         {
                             force_disconnect();
+                            std::cout << "Validate header failed \n";
                             return;
                         }
 
@@ -84,7 +84,7 @@ namespace Net
                 });
         }
 
-        Socket_type m_socket;
+        Protocol::socket m_socket;
         asio::io_context& m_io_context;
 
     private:
@@ -107,7 +107,7 @@ namespace Net
                 [this](asio::error_code error, size_t size) {
                     if (!error)
                     {
-                        std::cout << "reading body size:" << m_temp_message.m_body.size() << "\n";
+                        std::cout << "reading body | size:" << m_temp_message.m_body.size() << "\n";
                         add_message_to_incoming_queue(m_temp_message);
                         async_read_header();
                     }
@@ -123,9 +123,9 @@ namespace Net
                 [this](asio::error_code error, size_t size) {
                     if (!error)
                     {
-                        std::cout << "writing header validation: " << m_out_queue.front().m_header.m_validation_key
+                        std::cout << "writing header | validation: " << m_out_queue.front().m_header.m_validation_key
                                   << " size: " << m_out_queue.front().m_header.m_size
-                                  << " header bytes: " << sizeof(Net_message_header<Id_type>) << "\n";
+                                  << " id: " << static_cast<uint32_t>(m_out_queue.front().m_header.m_id) << "\n";
 
                         if (m_out_queue.front().m_header.m_size > 0)
                             async_write_body();
@@ -145,11 +145,11 @@ namespace Net
         void async_write_body()
         {
             asio::async_write(
-                m_socket, asio::buffer(m_out_queue.front().m_body.data(), m_out_queue.front().m_header.m_size),
+                m_socket, asio::buffer(m_out_queue.front().m_body.data(), m_out_queue.front().m_body.size()),
                 [this](asio::error_code error, size_t size) {
                     if (!error)
                     {
-                        std::cout << "Writing body size:" << m_out_queue.front().m_header.m_size << "\n";
+                        std::cout << "Writing body | size:" << m_out_queue.front().m_header.m_size << "\n";
                         m_out_queue.pop_front();
 
                         if (!m_out_queue.empty())
