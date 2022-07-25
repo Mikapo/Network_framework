@@ -22,13 +22,18 @@ namespace Net
         {
         }
 
+        Net_connection(const Net_connection&) = delete;
+        Net_connection(Net_connection&&) = delete;
+        Net_connection& operator=(const Net_connection&) = delete;
+        Net_connection operator=(Net_connection&&) = delete;
+
         void disconnect()
         {
             if (is_connected())
                 asio::post(m_io_context, [this] { m_socket.close(); });
         }
 
-        bool is_connected() const noexcept
+        bool is_connected() const
         {
             return m_socket.is_open();
         }
@@ -94,7 +99,7 @@ namespace Net
                 m_socket.close();
         }
 
-        bool validate_header(Net_message_header<Id_type> header)
+        bool validate_header(Net_message_header<Id_type> header) const noexcept
         {
             const bool validation_key_correct = header.m_validation_key == VALIDATION_KEY;
             return validation_key_correct;

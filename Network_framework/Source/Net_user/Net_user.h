@@ -12,6 +12,8 @@ namespace Net
     public:
         using Owned_message = Owned_message<Id_type>;
 
+        virtual ~Net_user() = default;
+
     protected:
         virtual void on_notification(std::string_view notification, Severity severity = Severity::notification)
         {

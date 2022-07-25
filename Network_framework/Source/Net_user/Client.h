@@ -15,7 +15,7 @@ namespace Net
         using Server_connection = Server_connection<Id_type>;
         using Server_connection_ptr = std::unique_ptr<Server_connection>;
 
-        Client() : m_socket(this->m_asio_context)
+        Client() noexcept : m_socket(this->m_asio_context)
         {
         }
 

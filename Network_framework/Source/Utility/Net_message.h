@@ -91,7 +91,7 @@ namespace Net
 
             for (size_t i = 0; i < size && m_body.size() != 0; ++i)
             {
-                char character;
+                char character = 0;
                 extract(character);
                 output.at((size - 1) - i) = character;
             }
