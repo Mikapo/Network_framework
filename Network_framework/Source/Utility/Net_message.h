@@ -55,6 +55,18 @@ namespace Net
             return *this;
         }
 
+        template <typename Iterator_type>
+        Net_message& push_back(Iterator_type begin, Iterator_type end)
+        {
+            const size_t size = end - begin;
+            m_body.reserve(size);
+
+            for (; begin != end; ++begin)
+                push_back(*begin);
+
+            return *this;
+        }
+
         template <typename Data_type>
         Net_message& extract(Data_type& data) requires(std::is_standard_layout_v<Data_type>)
         {
@@ -69,6 +81,22 @@ namespace Net
             resize_body(new_size);
             m_header.m_size = static_cast<uint32_t>(m_body.size());
             return *this;
+        }
+
+        std::string extract_as_string(size_t string_size = std::numeric_limits<size_t>::max())
+        {
+            std::string output;
+            const size_t size = std::min(string_size, m_body.size());
+            output.resize(size);
+
+            for (size_t i = 0; i < size && m_body.size() != 0; ++i)
+            {
+                char character;
+                extract(character);
+                output.at((size - 1) - i) = character;
+            }
+
+            return output;
         }
 
         template <typename Data_type>

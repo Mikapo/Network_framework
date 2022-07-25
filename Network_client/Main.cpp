@@ -17,7 +17,7 @@ private:
         switch (message.m_header.m_id)
         {
         case Message_id::server_message: {
-            const std::string string = get_string_from_message(message);
+            const std::string string = message.extract_as_string();
             std::cout << string << "\n";
             std::cout.flush();
         }
@@ -25,14 +25,6 @@ private:
         default:
             break;
         }
-    }
-
-    std::string get_string_from_message(const Net::Net_message<Message_id>& message)
-    {
-        std::string output;
-        for (size_t i = 0; i < message.m_body.size(); ++i)
-            output += message.m_body.at(i);
-        return output;
     }
 };
 
@@ -48,9 +40,7 @@ void send_thread()
 
         Net::Net_message<Message_id> net_message;
         net_message.m_header.m_id = Message_id::message;
-
-        for (size_t i = 0; i < message.size(); ++i)
-            net_message << message.at(i);
+        net_message.push_back(message.begin(), message.end());
 
         messages.push_back(net_message);
     }
@@ -64,9 +54,7 @@ void send_name(Chat_client& client)
 
     Net::Net_message<Message_id> message;
     message.m_header.m_id = Message_id::set_name;
-
-    for (size_t i = 0; i < username.size(); ++i)
-        message << username.at(i);
+    message.push_back(username.begin(), username.end());
 
     client.send_message(message);
 }

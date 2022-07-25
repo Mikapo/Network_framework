@@ -63,9 +63,9 @@ namespace Net
 
                         if (!validate_header(m_temp_message.m_header))
                         {
-                            force_disconnect();
+                            // force_disconnect();
                             std::cout << "Validate header failed \n";
-                            return;
+                            // return;
                         }
 
                         if (m_temp_message.m_header.m_size == 0)
