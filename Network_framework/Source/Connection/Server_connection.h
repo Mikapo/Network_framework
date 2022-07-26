@@ -11,17 +11,14 @@ namespace Net
     public:
         using Net_connection = Net_connection<Id_type>;
 
-        Server_connection(asio::io_context& io_context, Protocol::socket socket)
-            : Net_connection(io_context, std::move(socket))
+        Server_connection(Protocol::socket socket, const std::function<void(std::function<void()>)>& asio_job_callback)
+            : Net_connection(std::move(socket), asio_job_callback)
         {
         }
 
         void connect_to_server(const Protocol::resolver::results_type& endpoints)
         {
-            asio::async_connect(this->m_socket, endpoints, [this](asio::error_code error, Protocol::endpoint endpoint) {
-                if (!error)
-                    this->async_read_header();
-            });
+            this->async_connect(endpoints);
         }
 
         template <typename Func_type>
@@ -34,7 +31,6 @@ namespace Net
         void add_message_to_incoming_queue(const Net_message<Id_type>& message) override
         {
             this->m_on_message_received_callback(message);
-            this->async_read_header();
         }
 
         std::function<void(const Net_message<Id_type>&)> m_on_message_received_callback;

@@ -44,7 +44,10 @@ namespace Net
 
         virtual bool on_client_connect(Client_connection_interface<Id_type> client)
         {
-            return true;
+            if (client)
+                return true;
+
+            return false;
         }
 
         virtual void on_client_disconnect(Client_connection_interface<Id_type> client)

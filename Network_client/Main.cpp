@@ -6,7 +6,7 @@ enum class Message_id : uint8_t
 {
     set_name = 0,
     message = 1,
-    server_message = 2
+    server_message = 3
 };
 
 class Chat_client : public Net::Client_interface<Message_id>

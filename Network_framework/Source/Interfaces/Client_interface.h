@@ -20,7 +20,7 @@ namespace Net
             this->Underlying::disconnect();
         }
 
-        bool is_connected() const noexcept
+        [[nodiscard]] bool is_connected() const noexcept
         {
             return this->Underlying::is_connected();
         }
@@ -35,6 +35,6 @@ namespace Net
             this->Underlying::handle_received_messages(max_messages);
         }
 
-        void on_message(Net_message<Id_type>& message) = 0;
+        void on_message(Net_message<Id_type>& message) override = 0;
     };
 } // namespace Net

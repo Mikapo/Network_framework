@@ -7,7 +7,7 @@ enum class Message_id : uint8_t
 {
     set_name = 0,
     message = 1,
-    server_message = 2
+    server_message = 3
 };
 
 class Chat_server : public Net::Server_interface<Message_id>
@@ -71,13 +71,16 @@ private:
     std::unordered_map<uint32_t, std::string> m_names;
 };
 
-int main()
+void run_server()
 {
     Chat_server server(1234);
     server.start();
 
     while (true)
-    {
         server.handle_received_messages();
-    }
+}
+
+int main()
+{
+    run_server();
 }

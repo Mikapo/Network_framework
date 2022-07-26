@@ -15,7 +15,7 @@ namespace Net
         using Server_connection = Server_connection<Id_type>;
         using Server_connection_ptr = std::unique_ptr<Server_connection>;
 
-        Client() noexcept : m_socket(this->m_asio_context)
+        Client() noexcept : m_socket(this->create_socket())
         {
         }
 
@@ -28,17 +28,17 @@ namespace Net
         {
             try
             {
-                Protocol::resolver resolver(this->m_asio_context);
+                Protocol::resolver resolver = this->create_resolver();
                 auto endpoints = resolver.resolve(host, port);
 
-                m_connection =
-                    std::make_unique<Server_connection>(this->m_asio_context, Protocol::socket(this->m_asio_context));
+                auto give_asio_job_lambda = [this](std::function<void()> job) { this->give_asio_job(job); };
+                m_connection = std::make_unique<Server_connection>(this->create_socket(), give_asio_job_lambda);
 
                 m_connection->set_on_message_received_callback(
                     [this](const Net_message<Id_type>& message) { on_message_received(message); });
 
                 m_connection->connect_to_server(endpoints);
-                this->m_thread_handle = std::thread([this] { this->m_asio_context.run(); });
+                this->start_asio_thread();
             }
             catch (std::exception exception)
             {
@@ -53,15 +53,11 @@ namespace Net
             if (is_connected())
                 m_connection->disconnect();
 
-            this->m_asio_context.stop();
-
-            if (this->m_thread_handle.joinable())
-                this->m_thread_handle.join();
-
+            this->stop_asio_thread();
             m_connection.reset();
         }
 
-        bool is_connected() const noexcept
+        bool is_connected() const
         {
             if (m_connection)
                 return m_connection->is_connected();
@@ -77,9 +73,9 @@ namespace Net
 
         void handle_received_messages(size_t max_messages = std::numeric_limits<size_t>::max())
         {
-            for (size_t i = 0; i < max_messages && !this->m_in_queue.empty(); ++i)
+            for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
-                auto message = this->m_in_queue.pop_front();
+                auto message = this->in_queue_pop_front();
                 on_message(message.m_message);
             }
         }
@@ -93,7 +89,7 @@ namespace Net
         void on_message_received(const Net_message<Id_type>& message)
         {
             Owned_message<Id_type> owned_message = {.m_owner = nullptr, .m_message = message};
-            this->m_in_queue.push_back(std::move(owned_message));
+            this->in_queue_push_back(std::move(owned_message));
         }
 
         Protocol::socket m_socket;

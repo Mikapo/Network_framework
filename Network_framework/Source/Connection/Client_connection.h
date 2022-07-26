@@ -13,21 +13,21 @@ namespace Net
         using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
         using Net_connection = Net_connection<Id_type>;
 
-        Client_connection(asio::io_context& io_context, Protocol::socket socket)
-            : Net_connection(io_context, std::move(socket))
+        Client_connection(Protocol::socket socket, const std::function<void(std::function<void()>)>& asio_job_callback)
+            : Net_connection(std::move(socket), asio_job_callback)
         {
         }
 
         void connect_to_client(uint32_t id)
         {
-            if (this->m_socket.is_open())
+            if (this->is_connected())
             {
                 m_id = id;
-                this->async_read_header();
+                this->start_waiting_for_messages();
             }
         }
 
-        uint32_t get_id() const noexcept
+        [[nodiscard]] uint32_t get_id() const noexcept
         {
             return m_id;
         }

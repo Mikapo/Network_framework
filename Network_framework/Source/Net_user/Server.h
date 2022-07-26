@@ -11,6 +11,8 @@
 
 namespace Net
 {
+    constexpr uint32_t Client_id_start = 1000;
+
     template <Id_concept Id_type>
     class Server : public Net_user<Id_type>
     {
@@ -18,7 +20,7 @@ namespace Net
         using Client_connection = Client_connection<Id_type>;
         using Client_connection_ptr = std::shared_ptr<Client_connection>;
 
-        Server(uint16_t port) : m_acceptor(this->m_asio_context, Protocol::endpoint(Protocol::v4(), port))
+        Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
         {
         }
 
@@ -27,14 +29,19 @@ namespace Net
             stop();
         }
 
+        Server(const Server&) = delete;
+        Server(Server&&) = delete;
+        Server& operator=(const Server&) = delete;
+        Server& operator=(Server&&) = delete;
+
         bool start()
         {
             try
             {
                 async_wait_for_connections();
-                this->m_thread_handle = std::thread([this] { this->m_asio_context.run(); });
+                this->start_asio_thread();
             }
-            catch (std::exception exception)
+            catch (const std::exception& exception)
             {
                 this->on_notification(std::format("Server start error: {}", exception.what()), Severity::error);
                 return false;
@@ -46,10 +53,7 @@ namespace Net
 
         void stop()
         {
-            this->m_asio_context.stop();
-
-            if (this->m_thread_handle.joinable())
-                this->m_thread_handle.join();
+            this->stop_asio_thread();
             this->on_notification("Server has been stopped");
         }
 
@@ -61,8 +65,9 @@ namespace Net
                     this->on_notification(
                         std::format("Server new connection: {}", socket.remote_endpoint().address().to_string()));
 
+                    auto give_asio_job_lambda = [this](std::function<void()> job) { this->give_asio_job(job); };
                     std::shared_ptr new_connection =
-                        std::make_shared<Client_connection>(this->m_asio_context, std::move(socket));
+                        std::make_shared<Client_connection>(std::move(socket), give_asio_job_lambda);
 
                     if (on_client_connect(new_connection))
                     {
@@ -120,18 +125,18 @@ namespace Net
                     client.reset();
                     disconnected_clients_exist = true;
                 }
-
-                if (disconnected_clients_exist)
-                    m_connections.erase(
-                        std::remove(m_connections.begin(), m_connections.end(), nullptr), m_connections.end());
             }
+
+            if (disconnected_clients_exist)
+                m_connections.erase(
+                    std::remove(m_connections.begin(), m_connections.end(), nullptr), m_connections.end());
         }
 
         void handle_received_messages(size_t max_messages = std::numeric_limits<size_t>::max())
         {
-            for (size_t i = 0; i < max_messages && !this->m_in_queue.empty(); ++i)
+            for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
-                auto message = this->m_in_queue.pop_front();
+                auto message = this->in_queue_pop_front();
                 on_message(message.m_owner, message.m_message);
             }
         }
@@ -139,7 +144,10 @@ namespace Net
     protected:
         virtual bool on_client_connect(Client_connection_ptr client)
         {
-            return true;
+            if (client)
+                return true;
+
+            return false;
         }
 
         virtual void on_client_disconnect(Client_connection_ptr client)
@@ -160,11 +168,11 @@ namespace Net
         void on_message_received(const Net_message<Id_type>& message, Client_connection_ptr connection)
         {
             Owned_message<Id_type> owned_message = {.m_owner = connection, .m_message = message};
-            this->m_in_queue.push_back(std::move(owned_message));
+            this->in_queue_push_back(std::move(owned_message));
         }
 
         std::deque<Client_connection_ptr> m_connections;
         Protocol::acceptor m_acceptor;
-        uint32_t m_id_counter = 10000;
+        uint32_t m_id_counter = Client_id_start;
     };
 } // namespace Net

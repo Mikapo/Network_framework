@@ -24,20 +24,25 @@ namespace Net
                 m_client_connection->disconnect();
         }
 
-        bool is_connected() const
+        [[nodiscard]] bool is_connected() const
         {
             if (m_client_connection)
                 return m_client_connection->is_connected();
-            else
-                return false;
+
+            return false;
         }
 
-        uint32_t get_id() const noexcept
+        [[nodiscard]] uint32_t get_id() const noexcept
         {
             if (m_client_connection)
                 return m_client_connection->get_id();
-            else
-                return 0;
+
+            return 0;
+        }
+
+        operator bool() const noexcept
+        {
+            return m_client_connection.get();
         }
 
     private:
