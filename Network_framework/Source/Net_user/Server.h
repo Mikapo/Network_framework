@@ -65,20 +65,12 @@ namespace Net
                     this->on_notification(
                         std::format("Server new connection: {}", socket.remote_endpoint().address().to_string()));
 
-                    auto give_asio_job_lambda = [this](std::function<void()> job) { this->give_asio_job(job); };
-                    std::shared_ptr new_connection =
-                        std::make_shared<Client_connection>(std::move(socket), give_asio_job_lambda);
+                    Client_connection_ptr new_connection = construct_connection(std::move(socket));
 
                     if (on_client_connect(new_connection))
                     {
                         m_connections.push_back(new_connection);
                         m_connections.back()->connect_to_client(m_id_counter++);
-
-                        m_connections.back()->set_on_message_received_callback(
-                            [this](const Net_message<Id_type>& message, Client_connection_ptr connection) {
-                                on_message_received(message, connection);
-                            });
-
                         this->on_notification(
                             std::format("Client with id {} was accepted", m_connections.back()->get_id()));
                     }
@@ -144,10 +136,7 @@ namespace Net
     protected:
         virtual bool on_client_connect(Client_connection_ptr client)
         {
-            if (client)
-                return true;
-
-            return false;
+            return client.get();
         }
 
         virtual void on_client_disconnect(Client_connection_ptr client)
@@ -169,6 +158,32 @@ namespace Net
         {
             Owned_message<Id_type> owned_message = {.m_owner = connection, .m_message = message};
             this->in_queue_push_back(std::move(owned_message));
+        }
+
+        void on_new_accepted_message(Id_type type, Message_limits limits) override
+        {
+            for (Client_connection_ptr& connection : m_connections)
+                connection->add_accepted_message(type, limits);
+        }
+
+        [[nodiscard]] Client_connection_ptr construct_connection(Protocol::socket socket)
+        {
+            auto give_asio_job_lambda = [this](std::function<void()> job) { this->give_asio_job(job); };
+            std::shared_ptr new_connection =
+                std::make_shared<Client_connection>(std::move(socket), give_asio_job_lambda);
+
+            new_connection->set_on_message_received_callback(
+                [this](const Net_message<Id_type>& message, Client_connection_ptr connection) {
+                    on_message_received(message, connection);
+                });
+
+            new_connection->set_notification_callback([this](const std::string_view message, Severity severity) {
+                this->on_notification(message, severity);
+            });
+
+            new_connection->set_accepted_messages(this->get_current_accepted_messages());
+
+            return new_connection;
         }
 
         std::deque<Client_connection_ptr> m_connections;

@@ -13,7 +13,20 @@ namespace Net
     public:
         using Owned_message = Owned_message<Id_type>;
 
+        Net_user() = default;
         virtual ~Net_user() = default;
+
+        Net_user(const Net_user&) = delete;
+        Net_user(Net_user&&) = delete;
+        Net_user& operator=(const Net_user&) = delete;
+        Net_user& operator=(Net_user&&) = delete;
+
+        void add_accepted_message(Id_type type, uint32_t min, uint32_t max)
+        {
+            const Message_limits limits = {.m_min = min, .m_max = max};
+            m_accepted_messages[type] = limits;
+            on_new_accepted_message(type, limits);
+        }
 
     protected:
         virtual void on_notification(std::string_view notification, Severity severity = Severity::notification)
@@ -84,6 +97,11 @@ namespace Net
                 throw std::runtime_error("asio thread was not running");
         }
 
+        [[nodiscard]] const std::unordered_map<Id_type, Message_limits>& get_current_accepted_messages() const
+        {
+            return m_accepted_messages;
+        }
+
     private:
         void asio_thread()
         {
@@ -91,9 +109,13 @@ namespace Net
                 m_asio_context.run();
         }
 
+        virtual void on_new_accepted_message(Id_type type, Message_limits limits) = 0;
+
         std::thread m_thread_handle;
         asio::io_context m_asio_context;
         Thread_safe_deque<Owned_message> m_in_queue;
         bool m_asio_thread_stop_flag = true;
+
+        std::unordered_map<Id_type, Message_limits> m_accepted_messages;
     };
 }; // namespace Net

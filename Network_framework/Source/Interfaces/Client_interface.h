@@ -35,6 +35,11 @@ namespace Net
             this->Underlying::handle_received_messages(max_messages);
         }
 
+        void add_accepted_message(Id_type type, uint32_t min = 0, uint32_t max = std::numeric_limits<uint32_t>::max())
+        {
+            this->Underlying::add_accepted_message(type, min, max);
+        }
+
         void on_message(Net_message<Id_type>& message) override = 0;
     };
 } // namespace Net

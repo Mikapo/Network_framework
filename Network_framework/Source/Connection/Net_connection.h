@@ -6,9 +6,15 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <unordered_map>
 
 namespace Net
 {
+    struct Message_limits
+    {
+        uint32_t m_min = 0, m_max = 0;
+    };
+
     template <Id_concept Id_type>
     class Net_connection
     {
@@ -53,6 +59,22 @@ namespace Net
             return true;
         }
 
+        template <typename Func_type>
+        void set_notification_callback(const Func_type& func)
+        {
+            m_notification_callback = func;
+        }
+
+        void add_accepted_message(Id_type type, Message_limits limits)
+        {
+            m_accepted_messages[type] = limits;
+        }
+
+        void set_accepted_messages(const std::unordered_map<Id_type, Message_limits>& accepted_messages)
+        {
+            m_accepted_messages = accepted_messages;
+        }
+
     protected:
         void start_waiting_for_messages()
         {
@@ -70,23 +92,48 @@ namespace Net
             if (is_connected())
                 throw std::runtime_error("Socket is already connected");
 
-            asio::async_connect(m_socket, endpoints, [this](asio::error_code error, Protocol::endpoint endpoint) {
-                if (!error)
-                    this->start_waiting_for_messages();
-            });
+            asio::async_connect(
+                m_socket, endpoints, [this](asio::error_code error, const Protocol::endpoint& endpoint) {
+                    if (!error)
+                    {
+                        notification(
+                            std::format("Connected sucesfully to {}", endpoint.address().to_string()),
+                            Severity::notification);
+                        this->start_waiting_for_messages();
+                    }
+                });
+        }
+
+        void notification(std::string_view string, Severity severity)
+        {
+            if (m_notification_callback)
+                m_notification_callback(string, severity);
         }
 
     private:
-        void force_disconnect()
+        void force_disconnect(std::string_view reason)
         {
             if (m_socket.is_open())
+            {
+                notification(reason, Severity::error);
                 m_socket.close();
+            }
         }
 
-        bool validate_header(Net_message_header<Id_type> header) const noexcept
+        [[nodiscard]] bool validate_header(Net_message_header<Id_type> header) const noexcept
         {
-            const bool validation_key_correct = header.m_validation_key == VALIDATION_KEY;
-            return validation_key_correct;
+            if (header.m_validation_key != VALIDATION_KEY)
+                return false;
+
+            auto found_limits = m_accepted_messages.find(header.m_id);
+
+            if (found_limits == m_accepted_messages.end())
+                return false;
+
+            if (header.m_size < found_limits->second.m_min || header.m_size > found_limits->second.m_max)
+                return false;
+
+            return true;
         }
 
         void async_read_header()
@@ -100,7 +147,7 @@ namespace Net
                     {
                         if (!validate_header(m_temp_message.m_header))
                         {
-                            force_disconnect();
+                            force_disconnect("Header validation failed");
                             return;
                         }
 
@@ -116,7 +163,7 @@ namespace Net
                         async_read_body();
                     }
                     else
-                        force_disconnect();
+                        force_disconnect("Error on reading header likely because lost connection");
                 });
         }
 
@@ -131,7 +178,7 @@ namespace Net
                         async_read_header();
                     }
                     else
-                        force_disconnect();
+                        force_disconnect("Error on reading body");
                 });
         }
 
@@ -153,7 +200,7 @@ namespace Net
                         }
                     }
                     else
-                        force_disconnect();
+                        force_disconnect("Error on writing header");
                 });
         }
 
@@ -170,16 +217,21 @@ namespace Net
                             async_write_header();
                     }
                     else
-                        force_disconnect();
+                        force_disconnect("Error on writing body");
                 });
         }
 
         virtual void add_message_to_incoming_queue(const Net_message<Id_type>& message) = 0;
 
         Protocol::socket m_socket;
+
         Net_message<Id_type> m_temp_message;
         Thread_safe_deque<Net_message<Id_type>> m_out_queue;
+        std::unordered_map<Id_type, Message_limits> m_accepted_messages;
+
         std::function<void(std::function<void()>)> m_asio_job_callback;
+        std::function<void(std::string_view, Severity)> m_notification_callback;
+
         bool m_is_waiting_for_messages = false;
     };
 } // namespace Net

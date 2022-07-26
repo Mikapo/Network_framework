@@ -10,6 +10,12 @@
 namespace Net
 {
     template <Id_concept Id_type>
+    class Client_connection;
+
+    template <Id_concept Id_type>
+    class Net_connection;
+
+    template <Id_concept Id_type>
     struct Net_message_header
     {
         uint64_t m_validation_key = VALIDATION_KEY;
@@ -28,8 +34,11 @@ namespace Net
     };
 
     template <Id_concept Id_type>
-    struct Net_message
+    class Net_message
     {
+    public:
+        friend Net_connection<Id_type>;
+
         friend std::ostream& operator<<(std::ostream& stream, const Net_message& message)
         {
             stream << "ID: " << static_cast<std::underlying_type_t<Id_type>>(message.m_header.m_id)
@@ -56,7 +65,7 @@ namespace Net
         }
 
         template <typename Iterator_type>
-        Net_message& push_back(Iterator_type begin, Iterator_type end)
+        Net_message& push_back_from_container(Iterator_type begin, Iterator_type end)
         {
             const size_t size = end - begin;
             m_body.reserve(size);
@@ -83,18 +92,34 @@ namespace Net
             return *this;
         }
 
+        template <typename Iterator_type>
+        void extract_to_container(
+            Iterator_type begin, Iterator_type end, size_t max_amount = std::numeric_limits<size_t>::max())
+        {
+            using Type = std::remove_reference_t<decltype(*begin)>;
+            constexpr size_t type_size = sizeof(Type);
+
+            size_t amount = 0;
+            for (; begin != end; ++begin)
+            {
+                if (m_body.size() < type_size || amount > max_amount)
+                    break;
+
+                Type value;
+                extract(value);
+
+                *begin = std::move(value);
+
+                ++amount;
+            }
+        }
+
         std::string extract_as_string(size_t string_size = std::numeric_limits<size_t>::max())
         {
             std::string output;
             const size_t size = std::min(string_size, m_body.size());
             output.resize(size);
-
-            for (size_t i = 0; i < size && m_body.size() != 0; ++i)
-            {
-                char character = 0;
-                extract(character);
-                output.at((size - 1) - i) = character;
-            }
+            extract_to_container(output.rbegin(), output.rend());
 
             return output;
         }
@@ -123,27 +148,35 @@ namespace Net
             return !(*this == other);
         }
 
+        [[nodiscard]] Id_type get_id() const noexcept
+        {
+            return m_header.m_id;
+        }
+
+        void set_id(Id_type new_id) noexcept
+        {
+            m_header.m_id = new_id;
+        }
+
+        [[nodiscard]] bool is_empty() const noexcept
+        {
+            return m_body.empty();
+        }
+
+        [[nodiscard]] size_t size_in_bytes() const noexcept
+        {
+            return sizeof(m_header) + m_body.size();
+        }
+
+    private:
         void resize_body(size_t new_size)
         {
             m_body.resize(new_size);
         }
 
-        bool is_empty() const noexcept
-        {
-            return m_body.size() == 0;
-        }
-
-        size_t size_in_bytes() const noexcept
-        {
-            return sizeof(m_header) + m_body.size();
-        }
-
         Net_message_header<Id_type> m_header;
         std::vector<char> m_body = {};
     };
-
-    template <Id_concept Id_type>
-    class Client_connection;
 
     template <Id_concept Id_type>
     struct Owned_message
@@ -168,5 +201,4 @@ namespace Net
         Client_connection_ptr m_owner = nullptr;
         Net_message<Id_type> m_message;
     };
-
 }; // namespace Net

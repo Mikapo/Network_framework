@@ -11,10 +11,16 @@ enum class Message_id : uint8_t
 
 class Chat_client : public Net::Client_interface<Message_id>
 {
+public:
+    Chat_client()
+    {
+        add_accepted_message(Message_id::server_message);
+    }
+
 private:
     void on_message(Net::Net_message<Message_id>& message) override
     {
-        switch (message.m_header.m_id)
+        switch (message.get_id())
         {
         case Message_id::server_message: {
             const std::string string = message.extract_as_string();
@@ -25,6 +31,11 @@ private:
         default:
             break;
         }
+    }
+
+    void on_notification(std::string_view message, Net::Severity severity)
+    {
+        std::cout << message << "\n";
     }
 };
 
@@ -39,8 +50,8 @@ void send_thread()
         std::getline(std::cin, message);
 
         Net::Net_message<Message_id> net_message;
-        net_message.m_header.m_id = Message_id::message;
-        net_message.push_back(message.begin(), message.end());
+        net_message.set_id(Message_id::message);
+        net_message.push_back_from_container(message.begin(), message.end());
 
         messages.push_back(net_message);
     }
@@ -53,8 +64,8 @@ void send_name(Chat_client& client)
     std::getline(std::cin, username);
 
     Net::Net_message<Message_id> message;
-    message.m_header.m_id = Message_id::set_name;
-    message.push_back(username.begin(), username.end());
+    message.set_id(Message_id::set_name);
+    message.push_back_from_container(username.begin(), username.end());
 
     client.send_message(message);
 }
@@ -70,7 +81,7 @@ void main_loop(Chat_client& client)
     }
 }
 
-int main()
+void start_client()
 {
     std::cout << "Write server ip: ";
     std::string ip;
@@ -99,10 +110,23 @@ int main()
     else
     {
         std::cout << "failed to connect \n";
-        return 1;
+        return;
     }
 
     std::cout << "Lost connection to server \n";
+}
+
+int main()
+{
+    try
+    {
+        start_client();
+    }
+    catch (const std::exception& exception)
+    {
+        std::cout << "Exception: " << exception.what() << "\n";
+    }
+
     std::cout << "Press enter to exit... \n";
     std::cin.get();
 }

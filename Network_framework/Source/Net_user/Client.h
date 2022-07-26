@@ -19,10 +19,15 @@ namespace Net
         {
         }
 
-        virtual ~Client()
+        ~Client() override
         {
             disconnect();
         }
+
+        Client(const Client&) = delete;
+        Client(Client&&) = delete;
+        Client& operator=(const Client&) = delete;
+        Client& operator=(Client&&) = delete;
 
         bool connect(std::string_view host, std::string_view port)
         {
@@ -31,17 +36,13 @@ namespace Net
                 Protocol::resolver resolver = this->create_resolver();
                 auto endpoints = resolver.resolve(host, port);
 
-                auto give_asio_job_lambda = [this](std::function<void()> job) { this->give_asio_job(job); };
-                m_connection = std::make_unique<Server_connection>(this->create_socket(), give_asio_job_lambda);
-
-                m_connection->set_on_message_received_callback(
-                    [this](const Net_message<Id_type>& message) { on_message_received(message); });
-
+                m_connection = construct_new_connection();
                 m_connection->connect_to_server(endpoints);
                 this->start_asio_thread();
             }
-            catch (std::exception exception)
+            catch (const std::exception& exception)
             {
+                this->on_notification(std::format("Exception: {}", exception.what()), Severity::error);
                 return false;
             }
 
@@ -57,12 +58,12 @@ namespace Net
             m_connection.reset();
         }
 
-        bool is_connected() const
+        [[nodiscard]] bool is_connected() const
         {
             if (m_connection)
                 return m_connection->is_connected();
-            else
-                return false;
+
+            return false;
         }
 
         void send_message(const Net_message<Id_type>& message)
@@ -81,6 +82,24 @@ namespace Net
         }
 
     protected:
+        [[nodiscard]] Server_connection_ptr construct_new_connection()
+        {
+            auto give_asio_job_lambda = [this](std::function<void()> job) { this->give_asio_job(job); };
+            std::unique_ptr new_connection =
+                std::make_unique<Server_connection>(this->create_socket(), give_asio_job_lambda);
+
+            new_connection->set_on_message_received_callback(
+                [this](const Net_message<Id_type>& message) { on_message_received(message); });
+
+            new_connection->set_notification_callback([this](const std::string_view message, Severity severity) {
+                this->on_notification(message, severity);
+            });
+
+            new_connection->set_accepted_messages(this->get_current_accepted_messages());
+
+            return new_connection;
+        }
+
         virtual void on_message(Net_message<Id_type>& message)
         {
         }
@@ -90,6 +109,12 @@ namespace Net
         {
             Owned_message<Id_type> owned_message = {.m_owner = nullptr, .m_message = message};
             this->in_queue_push_back(std::move(owned_message));
+        }
+
+        void on_new_accepted_message(Id_type type, Message_limits limits) override
+        {
+            if (m_connection)
+                m_connection->add_accepted_message(type, limits);
         }
 
         Protocol::socket m_socket;
