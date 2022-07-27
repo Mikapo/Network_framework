@@ -13,7 +13,7 @@ namespace Net
     {
     public:
         using Server_connection = Server_connection<Id_type>;
-        using Server_connection_ptr = std::unique_ptr<Server_connection>;
+        using Server_connection_ptr = std::shared_ptr<Server_connection>;
 
         Client() noexcept : m_socket(this->create_socket())
         {
@@ -36,7 +36,7 @@ namespace Net
                 Protocol::resolver resolver = this->create_resolver();
                 auto endpoints = resolver.resolve(host, port);
 
-                m_connection = construct_new_connection();
+                m_connection = this->create_connection<Server_connection>(this->create_socket());
                 m_connection->connect_to_server(endpoints);
                 this->start_asio_thread();
             }
@@ -69,11 +69,14 @@ namespace Net
         void send_message(const Net_message<Id_type>& message)
         {
             if (is_connected())
-                m_connection->async_send_message(message);
+                this->async_send_message_to_connection(m_connection.get(), message);
         }
 
-        void handle_received_messages(size_t max_messages = std::numeric_limits<size_t>::max())
+        void handle_received_messages(size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false)
         {
+            if (wait)
+                this->wait_until_has_messages();
+
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
                 auto message = this->in_queue_pop_front();
@@ -82,35 +85,11 @@ namespace Net
         }
 
     protected:
-        [[nodiscard]] Server_connection_ptr construct_new_connection()
-        {
-            auto give_asio_job_lambda = [this](std::function<void()> job) { this->give_asio_job(job); };
-            std::unique_ptr new_connection =
-                std::make_unique<Server_connection>(this->create_socket(), give_asio_job_lambda);
-
-            new_connection->set_on_message_received_callback(
-                [this](const Net_message<Id_type>& message) { on_message_received(message); });
-
-            new_connection->set_notification_callback([this](const std::string_view message, Severity severity) {
-                this->on_notification(message, severity);
-            });
-
-            new_connection->set_accepted_messages(this->get_current_accepted_messages());
-
-            return new_connection;
-        }
-
         virtual void on_message(Net_message<Id_type>& message)
         {
         }
 
     private:
-        void on_message_received(const Net_message<Id_type>& message)
-        {
-            Owned_message<Id_type> owned_message = {.m_owner = nullptr, .m_message = message};
-            this->in_queue_push_back(std::move(owned_message));
-        }
-
         void on_new_accepted_message(Id_type type, Message_limits limits) override
         {
             if (m_connection)

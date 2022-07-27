@@ -65,7 +65,8 @@ namespace Net
                     this->on_notification(
                         std::format("Server new connection: {}", socket.remote_endpoint().address().to_string()));
 
-                    Client_connection_ptr new_connection = construct_connection(std::move(socket));
+                    Client_connection_ptr new_connection =
+                        this->create_connection<Client_connection>(std::move(socket));
 
                     if (on_client_connect(new_connection))
                     {
@@ -89,7 +90,7 @@ namespace Net
         void send_message_to_client(Client_connection_ptr client, const Net_message<Id_type>& message)
         {
             if (client && client->is_connected())
-                client->async_send_message(message);
+                this->async_send_message_to_connection(client.get(), message);
             else
             {
                 notify_client_disconnect(client);
@@ -109,7 +110,7 @@ namespace Net
                 if (client && client->is_connected())
                 {
                     if (client != ignored_client)
-                        client->async_send_message(message);
+                        this->async_send_message_to_connection(client.get(), message);
                 }
                 else
                 {
@@ -124,8 +125,11 @@ namespace Net
                     std::remove(m_connections.begin(), m_connections.end(), nullptr), m_connections.end());
         }
 
-        void handle_received_messages(size_t max_messages = std::numeric_limits<size_t>::max())
+        void handle_received_messages(size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = true)
         {
+            if (wait)
+                this->wait_until_has_messages();
+
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
                 auto message = this->in_queue_pop_front();
@@ -154,36 +158,10 @@ namespace Net
             on_client_disconnect(client);
         }
 
-        void on_message_received(const Net_message<Id_type>& message, Client_connection_ptr connection)
-        {
-            Owned_message<Id_type> owned_message = {.m_owner = connection, .m_message = message};
-            this->in_queue_push_back(std::move(owned_message));
-        }
-
         void on_new_accepted_message(Id_type type, Message_limits limits) override
         {
             for (Client_connection_ptr& connection : m_connections)
                 connection->add_accepted_message(type, limits);
-        }
-
-        [[nodiscard]] Client_connection_ptr construct_connection(Protocol::socket socket)
-        {
-            auto give_asio_job_lambda = [this](std::function<void()> job) { this->give_asio_job(job); };
-            std::shared_ptr new_connection =
-                std::make_shared<Client_connection>(std::move(socket), give_asio_job_lambda);
-
-            new_connection->set_on_message_received_callback(
-                [this](const Net_message<Id_type>& message, Client_connection_ptr connection) {
-                    on_message_received(message, connection);
-                });
-
-            new_connection->set_notification_callback([this](const std::string_view message, Severity severity) {
-                this->on_notification(message, severity);
-            });
-
-            new_connection->set_accepted_messages(this->get_current_accepted_messages());
-
-            return new_connection;
         }
 
         std::deque<Client_connection_ptr> m_connections;

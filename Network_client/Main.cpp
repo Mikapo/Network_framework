@@ -35,7 +35,6 @@ private:
 
     void on_notification(std::string_view message, Net::Severity severity)
     {
-        std::cout << message << "\n";
     }
 };
 

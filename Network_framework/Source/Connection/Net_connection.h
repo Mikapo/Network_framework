@@ -19,13 +19,8 @@ namespace Net
     class Net_connection
     {
     public:
-        Net_connection(Protocol::socket socket, const std::function<void(std::function<void()>)>& asio_job_callback)
-            : m_socket(std::move(socket))
+        Net_connection(Protocol::socket socket) : m_socket(std::move(socket))
         {
-            if (asio_job_callback)
-                m_asio_job_callback = asio_job_callback;
-            else
-                throw std::invalid_argument("asio_job_callback was null");
         }
 
         virtual ~Net_connection() = default;
@@ -34,10 +29,15 @@ namespace Net
         Net_connection& operator=(const Net_connection&) = delete;
         Net_connection& operator=(Net_connection&&) = delete;
 
-        void disconnect()
+        void disconnect(std::string_view reason = "")
         {
             if (is_connected())
-                m_asio_job_callback([this]() { m_socket.close(); });
+            {
+                if (!reason.empty())
+                    broadcast_notification(reason, Severity::error);
+
+                m_socket.close();
+            }
         }
 
         [[nodiscard]] bool is_connected() const
@@ -45,24 +45,26 @@ namespace Net
             return m_socket.is_open();
         }
 
-        bool async_send_message(const Net_message<Id_type>& message)
+        void send_message(const Net_message<Id_type>& message)
         {
-            m_asio_job_callback([this, message] {
-                const bool is_writing_message = !m_out_queue.empty();
+            const bool is_writing_message = !m_out_queue.empty();
 
-                m_out_queue.push_back(message);
+            m_out_queue.push_back(message);
 
-                if (!is_writing_message)
-                    async_write_header();
-            });
-
-            return true;
+            if (!is_writing_message)
+                async_write_header();
         }
 
         template <typename Func_type>
         void set_notification_callback(const Func_type& func)
         {
             m_notification_callback = func;
+        }
+
+        template <typename Func_type>
+        void set_on_message_received_callback(const Func_type& func)
+        {
+            m_on_message_received_callback = func;
         }
 
         void add_accepted_message(Id_type type, Message_limits limits)
@@ -96,7 +98,7 @@ namespace Net
                 m_socket, endpoints, [this](asio::error_code error, const Protocol::endpoint& endpoint) {
                     if (!error)
                     {
-                        notification(
+                        broadcast_notification(
                             std::format("Connected sucesfully to {}", endpoint.address().to_string()),
                             Severity::notification);
                         this->start_waiting_for_messages();
@@ -104,22 +106,19 @@ namespace Net
                 });
         }
 
-        void notification(std::string_view string, Severity severity)
+        void broadcast_on_message_received(const Owned_message<Id_type>& message)
+        {
+            if (m_on_message_received_callback)
+                m_on_message_received_callback(message);
+        }
+
+        void broadcast_notification(std::string_view string, Severity severity)
         {
             if (m_notification_callback)
                 m_notification_callback(string, severity);
         }
 
     private:
-        void force_disconnect(std::string_view reason)
-        {
-            if (m_socket.is_open())
-            {
-                notification(reason, Severity::error);
-                m_socket.close();
-            }
-        }
-
         [[nodiscard]] bool validate_header(Net_message_header<Id_type> header) const noexcept
         {
             if (header.m_validation_key != VALIDATION_KEY)
@@ -147,14 +146,14 @@ namespace Net
                     {
                         if (!validate_header(m_temp_message.m_header))
                         {
-                            force_disconnect("Header validation failed");
+                            disconnect("Header validation failed");
                             return;
                         }
 
                         if (m_temp_message.m_header.m_size == 0)
                         {
                             m_temp_message.resize_body(0);
-                            add_message_to_incoming_queue(m_temp_message);
+                            on_message_received(m_temp_message);
                             async_read_header();
                             return;
                         }
@@ -163,7 +162,7 @@ namespace Net
                         async_read_body();
                     }
                     else
-                        force_disconnect("Error on reading header likely because lost connection");
+                        disconnect("Error on reading header likely because lost connection");
                 });
         }
 
@@ -174,11 +173,11 @@ namespace Net
                 [this](asio::error_code error, size_t size) {
                     if (!error)
                     {
-                        add_message_to_incoming_queue(m_temp_message);
+                        on_message_received(m_temp_message);
                         async_read_header();
                     }
                     else
-                        force_disconnect("Error on reading body");
+                        disconnect("Error on reading body");
                 });
         }
 
@@ -200,7 +199,7 @@ namespace Net
                         }
                     }
                     else
-                        force_disconnect("Error on writing header");
+                        disconnect("Error on writing header");
                 });
         }
 
@@ -217,21 +216,20 @@ namespace Net
                             async_write_header();
                     }
                     else
-                        force_disconnect("Error on writing body");
+                        disconnect("Error on writing body");
                 });
         }
 
-        virtual void add_message_to_incoming_queue(const Net_message<Id_type>& message) = 0;
+        virtual void on_message_received(const Net_message<Id_type>& message) = 0;
 
         Protocol::socket m_socket;
+        bool m_is_waiting_for_messages = false;
 
         Net_message<Id_type> m_temp_message;
         Thread_safe_deque<Net_message<Id_type>> m_out_queue;
         std::unordered_map<Id_type, Message_limits> m_accepted_messages;
 
-        std::function<void(std::function<void()>)> m_asio_job_callback;
         std::function<void(std::string_view, Severity)> m_notification_callback;
-
-        bool m_is_waiting_for_messages = false;
+        std::function<void(const Owned_message<Id_type>&)> m_on_message_received_callback;
     };
 } // namespace Net

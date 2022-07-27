@@ -86,7 +86,7 @@ void run_server()
     server.start();
 
     while (true)
-        server.handle_received_messages();
+        server.handle_received_messages(10, true);
 }
 
 int main()

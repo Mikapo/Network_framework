@@ -198,7 +198,7 @@ namespace Net
             return !(*this == other);
         }
 
-        Client_connection_ptr m_owner = nullptr;
         Net_message<Id_type> m_message;
+        Client_connection_ptr m_owner = nullptr;
     };
 }; // namespace Net
