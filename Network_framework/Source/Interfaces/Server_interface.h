@@ -47,37 +47,21 @@ namespace Net
             this->Underlying::add_accepted_message(type, min, max);
         }
 
-        virtual bool on_client_connect(Client_connection_interface<Id_type> client)
+        bool on_client_connect(Client_connection_interface<Id_type> client) override
         {
             return client;
         }
 
-        virtual void on_client_disconnect(Client_connection_interface<Id_type> client)
+        void on_client_disconnect(Client_connection_interface<Id_type> client) override
         {
         }
 
-        virtual void on_message(Client_connection_interface<Id_type> client, Net_message<Id_type>& message)
+        void on_message(Client_connection_interface<Id_type> client, Net_message<Id_type> message) override
         {
         }
 
-        void on_notification(std::string_view notification, Severity severity = Severity::notification)
+        void on_notification(std::string_view notification, Severity severity = Severity::notification) override
         {
-        }
-
-    private:
-        bool on_client_connect(Underlying::Client_connection_ptr client)
-        {
-            return on_client_connect(Client_connection_interface<Id_type>(client));
-        }
-
-        void on_client_disconnect(Underlying::Client_connection_ptr client)
-        {
-            on_client_connect(Client_connection_interface<Id_type>(client));
-        }
-
-        void on_message(Underlying::Client_connection_ptr client, Net_message<Id_type>& message)
-        {
-            on_message(Client_connection_interface<Id_type>(client), message);
         }
     };
 } // namespace Net

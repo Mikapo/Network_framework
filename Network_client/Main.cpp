@@ -18,14 +18,13 @@ public:
     }
 
 private:
-    void on_message(Net::Net_message<Message_id>& message) override
+    void on_message(Net::Net_message<Message_id> message) override
     {
         switch (message.get_id())
         {
         case Message_id::server_message: {
             const std::string string = message.extract_as_string();
             std::cout << string << "\n";
-            std::cout.flush();
         }
 
         default:

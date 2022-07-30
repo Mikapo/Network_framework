@@ -29,12 +29,12 @@ namespace Net
         Net_connection& operator=(const Net_connection&) = delete;
         Net_connection& operator=(Net_connection&&) = delete;
 
-        void disconnect(std::string_view reason = "")
+        void disconnect(std::string_view reason = "", bool is_error = false)
         {
             if (is_connected())
             {
                 if (!reason.empty())
-                    broadcast_notification(reason, Severity::error);
+                    broadcast_notification(reason, is_error ? Severity::error : Severity::notification);
 
                 m_socket.close();
             }
@@ -146,7 +146,7 @@ namespace Net
                     {
                         if (!validate_header(m_temp_message.m_header))
                         {
-                            disconnect("Header validation failed");
+                            disconnect("Header validation failed", true);
                             return;
                         }
 
@@ -162,7 +162,7 @@ namespace Net
                         async_read_body();
                     }
                     else
-                        disconnect("Error on reading header likely because lost connection");
+                        disconnect("Error on reading header likely because lost connection", true);
                 });
         }
 
@@ -177,7 +177,7 @@ namespace Net
                         async_read_header();
                     }
                     else
-                        disconnect("Error on reading body");
+                        disconnect("Error on reading body", true);
                 });
         }
 
@@ -199,7 +199,7 @@ namespace Net
                         }
                     }
                     else
-                        disconnect("Error on writing header");
+                        disconnect("Error on writing header", true);
                 });
         }
 
@@ -216,7 +216,7 @@ namespace Net
                             async_write_header();
                     }
                     else
-                        disconnect("Error on writing body");
+                        disconnect("Error on writing body", true);
                 });
         }
 

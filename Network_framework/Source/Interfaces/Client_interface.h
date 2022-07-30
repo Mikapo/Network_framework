@@ -40,6 +40,6 @@ namespace Net
             this->Underlying::add_accepted_message(type, min, max);
         }
 
-        void on_message(Net_message<Id_type>& message) override = 0;
+        void on_message(Net_message<Id_type> message) override{};
     };
 } // namespace Net

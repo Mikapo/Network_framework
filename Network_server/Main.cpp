@@ -20,7 +20,7 @@ public:
     }
 
 private:
-    void on_message(Net::Client_connection_interface<Message_id> client, Net::Net_message<Message_id>& message) override
+    void on_message(Net::Client_connection_interface<Message_id> client, Net::Net_message<Message_id> message) override
     {
         switch (message.get_id())
         {

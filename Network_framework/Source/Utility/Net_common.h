@@ -17,7 +17,7 @@ namespace Net
     using Protocol = asio::ip::tcp;
 
     template <typename T>
-    concept Id_concept = std::is_enum_v<T> && std::is_unsigned_v<std::underlying_type_t<T>>;
+    concept Id_concept = std::is_enum_v<T>;
 
     enum class Severity : uint8_t
     {

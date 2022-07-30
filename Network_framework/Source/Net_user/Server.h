@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Connection/Client_connection.h"
+#include "../Interfaces/Client_connection_interface.h"
 #include "../Utility/Net_message.h"
 #include "../Utility/Thread_safe_deque.h"
 #include "Net_user.h"
@@ -57,42 +58,14 @@ namespace Net
             this->on_notification("Server has been stopped");
         }
 
-        void async_wait_for_connections()
-        {
-            m_acceptor.async_accept([this](asio::error_code error, Protocol::socket socket) {
-                if (!error)
-                {
-                    this->on_notification(
-                        std::format("Server new connection: {}", socket.remote_endpoint().address().to_string()));
-
-                    Client_connection_ptr new_connection =
-                        this->create_connection<Client_connection>(std::move(socket));
-
-                    if (on_client_connect(new_connection))
-                    {
-                        m_connections.push_back(new_connection);
-                        m_connections.back()->connect_to_client(m_id_counter++);
-                        this->on_notification(
-                            std::format("Client with id {} was accepted", m_connections.back()->get_id()));
-                    }
-                    else
-                    {
-                        this->on_notification("Server connection denied");
-                    }
-                }
-                else
-                    this->on_notification(std::format("Server connection error: {}", error.message()), Severity::error);
-
-                async_wait_for_connections();
-            });
-        }
-
         void send_message_to_client(Client_connection_ptr client, const Net_message<Id_type>& message)
         {
             if (client && client->is_connected())
                 this->async_send_message_to_connection(client.get(), message);
             else
             {
+                std::scoped_lock(m_connections_mutext);
+
                 notify_client_disconnect(client);
                 client.reset();
                 m_connections.erase(
@@ -103,6 +76,8 @@ namespace Net
         void send_message_to_all_clients(
             const Net_message<Id_type>& message, Client_connection_ptr ignored_client = nullptr)
         {
+            std::scoped_lock lock(m_connections_mutext);
+
             bool disconnected_clients_exist = false;
 
             for (auto& client : m_connections)
@@ -133,25 +108,57 @@ namespace Net
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
                 auto message = this->in_queue_pop_front();
-                on_message(message.m_owner, message.m_message);
+                on_message(message.m_owner, std::move(message.m_message));
             }
         }
 
     protected:
-        virtual bool on_client_connect(Client_connection_ptr client)
+        virtual bool on_client_connect(Client_connection_interface<Id_type> client)
         {
-            return client.get();
+            return true;
         }
 
-        virtual void on_client_disconnect(Client_connection_ptr client)
+        virtual void on_client_disconnect(Client_connection_interface<Id_type> client)
         {
         }
 
-        virtual void on_message(Client_connection_ptr client, Net_message<Id_type>& message)
+        virtual void on_message(Client_connection_interface<Id_type> client, Net_message<Id_type> message)
         {
         }
 
     private:
+        void async_wait_for_connections()
+        {
+            m_acceptor.async_accept([this](asio::error_code error, Protocol::socket socket) {
+                if (!error)
+                {
+                    std::scoped_lock lock(m_connections_mutext);
+
+                    this->on_notification(
+                        std::format("Server new connection: {}", socket.remote_endpoint().address().to_string()));
+
+                    Client_connection_ptr new_connection =
+                        this->create_connection<Client_connection>(std::move(socket));
+
+                    if (on_client_connect(new_connection))
+                    {
+                        m_connections.push_back(new_connection);
+                        m_connections.back()->connect_to_client(m_id_counter++);
+                        this->on_notification(
+                            std::format("Client with id {} was accepted", m_connections.back()->get_id()));
+                    }
+                    else
+                    {
+                        this->on_notification("Server connection denied");
+                    }
+                }
+                else
+                    this->on_notification(std::format("Server connection error: {}", error.message()), Severity::error);
+
+                async_wait_for_connections();
+            });
+        }
+
         void notify_client_disconnect(Client_connection_ptr client)
         {
             this->on_notification(std::format("Client disconnected"));
@@ -160,11 +167,15 @@ namespace Net
 
         void on_new_accepted_message(Id_type type, Message_limits limits) override
         {
+            std::scoped_lock lock(m_connections_mutext);
+
             for (Client_connection_ptr& connection : m_connections)
                 connection->add_accepted_message(type, limits);
         }
 
         std::deque<Client_connection_ptr> m_connections;
+        std::mutex m_connections_mutext;
+
         Protocol::acceptor m_acceptor;
         uint32_t m_id_counter = Client_id_start;
     };

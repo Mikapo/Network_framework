@@ -80,12 +80,12 @@ namespace Net
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
                 auto message = this->in_queue_pop_front();
-                on_message(message.m_message);
+                on_message(std::move(message.m_message));
             }
         }
 
     protected:
-        virtual void on_message(Net_message<Id_type>& message)
+        virtual void on_message(Net_message<Id_type> message)
         {
         }
 

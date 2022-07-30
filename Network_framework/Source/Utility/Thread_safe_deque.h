@@ -20,13 +20,13 @@ namespace Net
         Thread_safe_deque& operator=(const Thread_safe_deque&) = delete;
         Thread_safe_deque& operator=(Thread_safe_deque&&) = delete;
 
-        const T& front()
+        [[nodiscard]] const T& front()
         {
             std::scoped_lock lock(m_mutex);
             return m_queue.front();
         }
 
-        const T& back()
+        [[nodiscard]] const T& back()
         {
             std::scoped_lock lock(m_mutex);
             return m_queue.back();
@@ -44,13 +44,20 @@ namespace Net
             return m_queue.push_back(std::move(item));
         }
 
-        bool empty()
+        [[nodiscard]] bool empty()
         {
             std::scoped_lock lock(m_mutex);
             return m_queue.empty();
         }
 
-        size_t count()
+        template <typename... Argtypes>
+        void erase(const Argtypes&... args)
+        {
+            std::scoped_lock lock(m_mutex);
+            m_queue.erase(args...);
+        }
+
+        [[nodiscard]] size_t count()
         {
             std::scoped_lock lock(m_mutex);
             return m_queue.count();
@@ -58,7 +65,7 @@ namespace Net
 
         void clear()
         {
-            typename std::scoped_lock lock(m_mutex);
+            std::scoped_lock lock(m_mutex);
             return m_queue.clear();
         }
 
