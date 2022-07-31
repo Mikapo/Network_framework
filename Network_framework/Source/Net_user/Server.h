@@ -194,6 +194,6 @@ namespace Net
         Protocol::acceptor m_acceptor;
         uint32_t m_id_counter = Client_id_start;
 
-        std::unordered_set<std::string_view> m_banned_ip;
+        std::unordered_set<std::string> m_banned_ip;
     };
 } // namespace Net
