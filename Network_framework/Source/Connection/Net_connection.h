@@ -30,7 +30,7 @@ namespace Net
         Net_connection& operator=(const Net_connection&) = delete;
         Net_connection& operator=(Net_connection&&) = delete;
 
-        void disconnect(std::string_view reason = "", bool is_error = false)
+        void disconnect(const std::string& reason = "", bool is_error = false)
         {
             if (is_connected())
             {
@@ -118,7 +118,7 @@ namespace Net
                 m_on_message_received_callback(message);
         }
 
-        void broadcast_notification(std::string_view string, Severity severity)
+        void broadcast_notification(const std::string& string, Severity severity)
         {
             if (m_notification_callback)
                 m_notification_callback(string, severity);
@@ -242,7 +242,7 @@ namespace Net
         Thread_safe_deque<Net_message<Id_type>> m_out_queue;
         std::unordered_map<Id_type, Message_limits> m_accepted_messages;
 
-        std::function<void(std::string_view, Severity)> m_notification_callback;
+        std::function<void(const std::string&, Severity)> m_notification_callback;
         std::function<void(const Owned_message<Id_type>&)> m_on_message_received_callback;
     };
 } // namespace Net

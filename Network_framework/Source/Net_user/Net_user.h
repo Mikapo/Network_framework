@@ -29,6 +29,20 @@ namespace Net
             on_new_accepted_message(type, limits);
         }
 
+        void update(size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false)
+        {
+            if (wait)
+                wait_until_has_messages();
+
+            handle_received_messages(max_messages);
+
+            for (size_t i = 0; i < max_messages && !m_notifications.empty(); ++i)
+            {
+                Notification notification = m_notifications.pop_front();
+                on_notification(notification.m_message, notification.m_severity);
+            }
+        }
+
     protected:
         virtual void on_notification(std::string_view notification, Severity severity = Severity::notification)
         {
@@ -47,6 +61,13 @@ namespace Net
         void in_queue_push_back(const Owned_message<Id_type>& message)
         {
             m_in_queue.push_back(message);
+            m_wait_until_messages.notify_one();
+        }
+
+        void notifications_push_back(const std::string& message, Severity severity = Severity::notification)
+        {
+            Notification notification = {.m_message = message, .m_severity = severity};
+            m_notifications.push_back(std::move(notification));
             m_wait_until_messages.notify_one();
         }
 
@@ -85,7 +106,7 @@ namespace Net
                 [this](const Owned_message<Id_type>& message) { on_message_received(message); });
 
             new_connection->set_notification_callback(
-                [this](const std::string_view message, Severity severity) { on_notification(message, severity); });
+                [this](const std::string& message, Severity severity) { notifications_push_back(message, severity); });
 
             new_connection->set_accepted_messages(get_current_accepted_messages());
 
@@ -111,7 +132,7 @@ namespace Net
         {
             std::unique_lock lock(m_wait_mutex);
 
-            auto wait_lambda = [this] { return !m_in_queue.empty(); };
+            auto wait_lambda = [this] { return !m_in_queue.empty() || !m_notifications.empty(); };
 
             m_wait_until_messages.wait(lock, wait_lambda);
         }
@@ -141,6 +162,12 @@ namespace Net
         }
 
     private:
+        struct Notification
+        {
+            std::string m_message = "";
+            Severity m_severity = Severity::notification;
+        };
+
         void asio_thread()
         {
             while (!m_asio_thread_stop_flag)
@@ -148,6 +175,7 @@ namespace Net
         }
 
         virtual void on_new_accepted_message(Id_type type, Message_limits limits) = 0;
+        virtual void handle_received_messages(size_t max_messages) = 0;
 
         asio::io_context m_asio_context;
 
@@ -159,5 +187,6 @@ namespace Net
 
         std::unordered_map<Id_type, Message_limits> m_accepted_messages;
         Thread_safe_deque<Owned_message<Id_type>> m_in_queue;
+        Thread_safe_deque<Notification> m_notifications;
     };
 }; // namespace Net

@@ -111,20 +111,6 @@ namespace Net
                     std::remove(m_connections.begin(), m_connections.end(), nullptr), m_connections.end());
         }
 
-        void handle_received_messages(size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = true)
-        {
-            if (wait)
-                this->wait_until_has_messages();
-
-            for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
-            {
-                Owned_message<Id_type> message = this->in_queue_pop_front();
-                Client_connection_interface<Id_type> connection_interface(message.m_owner);
-
-                on_message(connection_interface, std::move(message.m_message));
-            }
-        }
-
     protected:
         virtual bool on_client_connect(Client_connection_interface<Id_type> client)
         {
@@ -140,17 +126,28 @@ namespace Net
         }
 
     private:
+        void handle_received_messages(size_t max_messages) override
+        {
+            for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
+            {
+                Owned_message<Id_type> message = this->in_queue_pop_front();
+                Client_connection_interface<Id_type> connection_interface(message.m_owner);
+
+                on_message(connection_interface, std::move(message.m_message));
+            }
+        }
+
         void handle_new_connection(Protocol::socket socket)
         {
             std::scoped_lock lock(m_connections_mutext);
 
             const std::string ip = socket.remote_endpoint().address().to_string();
 
-            this->on_notification(std::format("Server new connection: {}", ip));
+            this->notifications_push_back(std::format("Server new connection: {}", ip));
 
             if (m_banned_ip.contains(ip))
             {
-                this->on_notification(std::format("Client with ip {} is banned", ip));
+                this->notifications_push_back(std::format("Client with ip {} is banned", ip));
                 return;
             }
 
@@ -161,12 +158,12 @@ namespace Net
                 m_connections.push_back(new_connection);
                 new_connection->connect_to_client(m_id_counter++);
 
-                this->on_notification(
+                this->notifications_push_back(
                     std::format("Client with ip {} was accepted and assigned ip {} to it", ip, m_id_counter - 1));
             }
 
             else
-                this->on_notification(std::format("Connection {} denied", ip));
+                this->notifications_push_back(std::format("Connection {} denied", ip));
         }
 
         void async_wait_for_connections()
@@ -175,7 +172,8 @@ namespace Net
                 if (!error)
                     handle_new_connection(std::move(socket));
                 else
-                    this->on_notification(std::format("Server connection error: {}", error.message()), Severity::error);
+                    this->notifications_push_back(
+                        std::format("Server connection error: {}", error.message()), Severity::error);
 
                 async_wait_for_connections();
             });
@@ -183,7 +181,8 @@ namespace Net
 
         void notify_client_disconnect(Client_connection_ptr client)
         {
-            this->on_notification(std::format("Client disconnected ip: {} id: {}", client->get_ip(), client->get_id()));
+            this->notifications_push_back(
+                std::format("Client disconnected ip: {} id: {}", client->get_ip(), client->get_id()));
             on_client_disconnect(Client_connection_interface<Id_type>(client));
         }
 

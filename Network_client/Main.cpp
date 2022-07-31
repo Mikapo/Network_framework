@@ -72,7 +72,7 @@ void main_loop(Chat_client& client)
 {
     while (client.is_connected())
     {
-        client.handle_received_messages();
+        client.update();
 
         if (!messages.empty())
             client.send_message(messages.pop_front());

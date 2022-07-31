@@ -42,7 +42,7 @@ namespace Net
             }
             catch (const std::exception& exception)
             {
-                this->on_notification(std::format("Exception: {}", exception.what()), Severity::error);
+                this->notifications_push_back(std::format("Exception: {}", exception.what()), Severity::error);
                 return false;
             }
 
@@ -72,11 +72,14 @@ namespace Net
                 this->async_send_message_to_connection(m_connection.get(), message);
         }
 
-        void handle_received_messages(size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false)
+    protected:
+        virtual void on_message(Net_message<Id_type> message)
         {
-            if (wait)
-                this->wait_until_has_messages();
+        }
 
+    private:
+        void handle_received_messages(size_t max_messages) override
+        {
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
                 auto message = this->in_queue_pop_front();
@@ -84,12 +87,6 @@ namespace Net
             }
         }
 
-    protected:
-        virtual void on_message(Net_message<Id_type> message)
-        {
-        }
-
-    private:
         void on_new_accepted_message(Id_type type, Message_limits limits) override
         {
             if (m_connection)

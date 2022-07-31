@@ -86,10 +86,10 @@ void run_server()
     Chat_server server(port);
     server.start();
 
-    constexpr size_t max_messages_handled = 10;
+    constexpr size_t max_messages = 10;
 
     while (true)
-        server.handle_received_messages(max_messages_handled, true);
+        server.update(max_messages, true);
 }
 
 int main()
