@@ -13,7 +13,7 @@ namespace Net
         using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
         using Net_connection = Net_connection<Id_type>;
 
-        Client_connection(Protocol::socket socket) : Net_connection(std::move(socket))
+        explicit Client_connection(Protocol::socket socket) : Net_connection(std::move(socket))
         {
         }
 

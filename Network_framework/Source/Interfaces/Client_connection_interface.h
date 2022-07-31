@@ -14,7 +14,7 @@ namespace Net
         friend Server_interface<Id_type>;
         using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
 
-        Client_connection_interface(Client_connection_ptr ptr) : m_client_connection(ptr)
+        explicit Client_connection_interface(std::shared_ptr<Client_connection<Id_type>> ptr) : m_client_connection(ptr)
         {
         }
 

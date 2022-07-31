@@ -22,7 +22,7 @@ namespace Net
         using Client_connection = Client_connection<Id_type>;
         using Client_connection_ptr = std::shared_ptr<Client_connection>;
 
-        Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
+        explicit Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
         {
         }
 
@@ -118,8 +118,10 @@ namespace Net
 
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
-                auto message = this->in_queue_pop_front();
-                on_message(message.m_owner, std::move(message.m_message));
+                Owned_message<Id_type> message = this->in_queue_pop_front();
+                Client_connection_interface<Id_type> connection_interface(message.m_owner);
+
+                on_message(connection_interface, std::move(message.m_message));
             }
         }
 
@@ -138,35 +140,40 @@ namespace Net
         }
 
     private:
+        void handle_new_connection(Protocol::socket socket)
+        {
+            std::scoped_lock lock(m_connections_mutext);
+
+            const std::string ip = socket.remote_endpoint().address().to_string();
+
+            this->on_notification(std::format("Server new connection: {}", ip));
+
+            if (m_banned_ip.contains(ip))
+            {
+                this->on_notification(std::format("Client with ip {} is banned", ip));
+                return;
+            }
+
+            Client_connection_ptr new_connection = this->create_connection<Client_connection>(std::move(socket));
+
+            if (on_client_connect(Client_connection_interface<Id_type>(new_connection)))
+            {
+                m_connections.push_back(new_connection);
+                new_connection->connect_to_client(m_id_counter++);
+
+                this->on_notification(
+                    std::format("Client with ip {} was accepted and assigned ip {} to it", ip, m_id_counter - 1));
+            }
+
+            else
+                this->on_notification(std::format("Connection {} denied", ip));
+        }
+
         void async_wait_for_connections()
         {
             m_acceptor.async_accept([this](asio::error_code error, Protocol::socket socket) {
                 if (!error)
-                {
-                    std::scoped_lock lock(m_connections_mutext);
-
-                    std::string ip_as_string = socket.remote_endpoint().address().to_string();
-
-                    if (m_banned_ip.contains(ip_as_string))
-                        return;
-
-                    this->on_notification(std::format("Server new connection: {}", ip_as_string));
-
-                    Client_connection_ptr new_connection =
-                        this->create_connection<Client_connection>(std::move(socket));
-
-                    if (on_client_connect(new_connection))
-                    {
-                        m_connections.push_back(new_connection);
-                        m_connections.back()->connect_to_client(m_id_counter++);
-                        this->on_notification(
-                            std::format("Client with id {} was accepted", m_connections.back()->get_id()));
-                    }
-                    else
-                    {
-                        this->on_notification("Server connection denied");
-                    }
-                }
+                    handle_new_connection(std::move(socket));
                 else
                     this->on_notification(std::format("Server connection error: {}", error.message()), Severity::error);
 
@@ -176,8 +183,8 @@ namespace Net
 
         void notify_client_disconnect(Client_connection_ptr client)
         {
-            this->on_notification(std::format("Client {} disconnected", client->get_ip()));
-            on_client_disconnect(client);
+            this->on_notification(std::format("Client disconnected ip: {} id: {}", client->get_ip(), client->get_id()));
+            on_client_disconnect(Client_connection_interface<Id_type>(client));
         }
 
         void on_new_accepted_message(Id_type type, Message_limits limits) override

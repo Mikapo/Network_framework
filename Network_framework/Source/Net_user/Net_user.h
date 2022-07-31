@@ -127,7 +127,7 @@ namespace Net
 
         void async_send_message_to_connection(Net_connection<Id_type>* connection, const Net_message<Id_type>& message)
         {
-            give_job_to_asio([this, connection, message] { connection->send_message(message); });
+            give_job_to_asio([connection, message] { connection->send_message(message); });
         }
 
         [[nodiscard]] const std::unordered_map<Id_type, Message_limits>& get_current_accepted_messages() const

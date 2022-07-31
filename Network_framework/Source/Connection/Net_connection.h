@@ -19,7 +19,7 @@ namespace Net
     class Net_connection
     {
     public:
-        Net_connection(Protocol::socket socket) : m_socket(std::move(socket))
+        explicit Net_connection(Protocol::socket socket) : m_socket(std::move(socket))
         {
             update_ip();
         }

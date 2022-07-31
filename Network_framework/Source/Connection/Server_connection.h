@@ -11,7 +11,7 @@ namespace Net
     public:
         using Net_connection = Net_connection<Id_type>;
 
-        Server_connection(Protocol::socket socket) : Net_connection(std::move(socket))
+        explicit Server_connection(Protocol::socket socket) : Net_connection(std::move(socket))
         {
         }
 

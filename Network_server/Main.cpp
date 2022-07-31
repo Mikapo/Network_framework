@@ -5,17 +5,17 @@
 
 enum class Message_id : uint8_t
 {
-    set_name = 0,
-    message = 1,
-    server_message = 3
+    set_name,
+    message,
+    server_message
 };
 
 class Chat_server : public Net::Server_interface<Message_id>
 {
 public:
-    Chat_server(uint16_t port) : Server_interface<Message_id>(port)
+    explicit Chat_server(uint16_t port) : Server_interface<Message_id>(port)
     {
-        add_accepted_message(Message_id::set_name, 0, 10);
+        add_accepted_message(Message_id::set_name);
         add_accepted_message(Message_id::message);
     }
 
@@ -72,7 +72,7 @@ private:
         }
     }
 
-    void on_notification(std::string_view notification, Net::Severity severity = Net::Severity::notification) override
+    void on_notification(std::string_view notification, Net::Severity severity) override
     {
         std::cout << notification << "\n";
     }
@@ -82,11 +82,14 @@ private:
 
 void run_server()
 {
-    Chat_server server(1234);
+    constexpr uint16_t port = 1234;
+    Chat_server server(port);
     server.start();
 
+    constexpr size_t max_messages_handled = 10;
+
     while (true)
-        server.handle_received_messages(10, true);
+        server.handle_received_messages(max_messages_handled, true);
 }
 
 int main()

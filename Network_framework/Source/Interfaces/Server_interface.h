@@ -11,7 +11,7 @@ namespace Net
     public:
         using Underlying = Server<Id_type>;
 
-        Server_interface(uint16_t port) : Underlying(port)
+        explicit Server_interface(uint16_t port) : Underlying(port)
         {
         }
 

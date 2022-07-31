@@ -183,6 +183,11 @@ namespace Net
     {
         using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
 
+        Owned_message(const Net_message<Id_type>& message, Client_connection_ptr owner)
+            : m_message(message), m_owner(owner)
+        {
+        }
+
         friend std::ostream& operator<<(std::ostream& stream, const Owned_message& message)
         {
             return stream << message.m_message;
