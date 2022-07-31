@@ -25,6 +25,16 @@ namespace Net
             this->Underlying::stop();
         }
 
+        void ban_ip(const std::string& ip)
+        {
+            this->Underlying::ban_ip(ip);
+        }
+
+        void unban_ip(const std::string& ip)
+        {
+            this->Underlying::unban_ip(ip);
+        }
+
         void send_message_to_client(Client_connection_interface<Id_type> client, const Net_message<Id_type>& message)
         {
             this->Underlying::send_message_to_client(client.get_underlying(), message);

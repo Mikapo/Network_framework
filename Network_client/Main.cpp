@@ -32,7 +32,7 @@ private:
         }
     }
 
-    void on_notification(std::string_view message, Net::Severity severity)
+    void on_notification(std::string_view message, Net::Severity severity) override
     {
     }
 };

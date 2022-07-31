@@ -21,6 +21,7 @@ namespace Net
     public:
         Net_connection(Protocol::socket socket) : m_socket(std::move(socket))
         {
+            update_ip();
         }
 
         virtual ~Net_connection() = default;
@@ -43,6 +44,11 @@ namespace Net
         [[nodiscard]] bool is_connected() const
         {
             return m_socket.is_open();
+        }
+
+        [[nodiscard]] std::string_view get_ip() const
+        {
+            return m_ip;
         }
 
         void send_message(const Net_message<Id_type>& message)
@@ -98,9 +104,9 @@ namespace Net
                 m_socket, endpoints, [this](asio::error_code error, const Protocol::endpoint& endpoint) {
                     if (!error)
                     {
+                        update_ip();
                         broadcast_notification(
-                            std::format("Connected sucesfully to {}", endpoint.address().to_string()),
-                            Severity::notification);
+                            std::format("Connected sucesfully to {}", get_ip()), Severity::notification);
                         this->start_waiting_for_messages();
                     }
                 });
@@ -116,6 +122,12 @@ namespace Net
         {
             if (m_notification_callback)
                 m_notification_callback(string, severity);
+        }
+
+        void update_ip()
+        {
+            if (is_connected())
+                m_ip = m_socket.remote_endpoint().address().to_string();
         }
 
     private:
@@ -224,6 +236,7 @@ namespace Net
 
         Protocol::socket m_socket;
         bool m_is_waiting_for_messages = false;
+        std::string m_ip = "0.0.0.0";
 
         Net_message<Id_type> m_temp_message;
         Thread_safe_deque<Net_message<Id_type>> m_out_queue;

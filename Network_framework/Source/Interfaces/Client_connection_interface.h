@@ -40,6 +40,14 @@ namespace Net
             return 0;
         }
 
+        [[nodiscard]] std::string_view get_ip() const
+        {
+            if (m_client_connection)
+                return m_client_connection->get_ip();
+
+            return "0.0.0.0";
+        }
+
         operator bool() const noexcept
         {
             return m_client_connection.get();

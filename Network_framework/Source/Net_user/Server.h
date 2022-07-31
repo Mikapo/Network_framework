@@ -9,6 +9,7 @@
 #include <format>
 #include <limits>
 #include <memory>
+#include <unordered_set>
 
 namespace Net
 {
@@ -58,13 +59,23 @@ namespace Net
             this->on_notification("Server has been stopped");
         }
 
+        void ban_ip(const std::string& ip)
+        {
+            m_banned_ip.insert(ip);
+        }
+
+        void unban_ip(const std::string& ip)
+        {
+            m_banned_ip.erase(ip);
+        }
+
         void send_message_to_client(Client_connection_ptr client, const Net_message<Id_type>& message)
         {
             if (client && client->is_connected())
                 this->async_send_message_to_connection(client.get(), message);
             else
             {
-                std::scoped_lock(m_connections_mutext);
+                std::scoped_lock lock(m_connections_mutext);
 
                 notify_client_disconnect(client);
                 client.reset();
@@ -134,8 +145,12 @@ namespace Net
                 {
                     std::scoped_lock lock(m_connections_mutext);
 
-                    this->on_notification(
-                        std::format("Server new connection: {}", socket.remote_endpoint().address().to_string()));
+                    std::string ip_as_string = socket.remote_endpoint().address().to_string();
+
+                    if (m_banned_ip.contains(ip_as_string))
+                        return;
+
+                    this->on_notification(std::format("Server new connection: {}", ip_as_string));
 
                     Client_connection_ptr new_connection =
                         this->create_connection<Client_connection>(std::move(socket));
@@ -161,7 +176,7 @@ namespace Net
 
         void notify_client_disconnect(Client_connection_ptr client)
         {
-            this->on_notification(std::format("Client disconnected"));
+            this->on_notification(std::format("Client {} disconnected", client->get_ip()));
             on_client_disconnect(client);
         }
 
@@ -178,5 +193,7 @@ namespace Net
 
         Protocol::acceptor m_acceptor;
         uint32_t m_id_counter = Client_id_start;
+
+        std::unordered_set<std::string_view> m_banned_ip;
     };
 } // namespace Net
