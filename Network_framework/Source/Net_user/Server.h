@@ -194,6 +194,27 @@ namespace Net
                 connection->add_accepted_message(type, limits);
         }
 
+        void check_connections() override
+        {
+            std::scoped_lock lock(m_connections_mutext);
+
+            bool disconnected_clients_exist = false;
+
+            for (auto& client : m_connections)
+            {
+                if (!client || !client->is_connected())
+                {
+                    notify_client_disconnect(client);
+                    client.reset();
+                    disconnected_clients_exist = true;
+                }
+            }
+
+            if (disconnected_clients_exist)
+                m_connections.erase(
+                    std::remove(m_connections.begin(), m_connections.end(), nullptr), m_connections.end());
+        }
+
         std::deque<Client_connection_ptr> m_connections;
         std::mutex m_connections_mutext;
 

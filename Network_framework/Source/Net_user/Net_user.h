@@ -4,8 +4,10 @@
 #include "../Utility/Net_common.h"
 #include "../Utility/Net_message.h"
 #include "../Utility/Thread_safe_deque.h"
+#include <chrono>
 #include <concepts>
 #include <functional>
+#include <optional>
 #include <thread>
 
 namespace Net
@@ -14,6 +16,8 @@ namespace Net
     class Net_user
     {
     public:
+        using Seconds = std::chrono::seconds;
+
         Net_user() = default;
         virtual ~Net_user() = default;
 
@@ -29,10 +33,14 @@ namespace Net
             on_new_accepted_message(type, limits);
         }
 
-        void update(size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false)
+        void update(
+            size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false,
+            std::optional<Seconds> check_connections_interval = std::optional<Seconds>())
         {
-            if (wait)
-                wait_until_has_messages();
+            if (check_connections_interval.has_value())
+                handle_check_connections_delay(wait, check_connections_interval.value());
+            else if (wait)
+                wait_until_has_something_to_do();
 
             handle_received_messages(max_messages);
 
@@ -128,13 +136,16 @@ namespace Net
             return Protocol::acceptor(m_asio_context, endpoint);
         }
 
-        void wait_until_has_messages()
+        void wait_until_has_something_to_do(std::optional<Seconds> wait_time = std::optional<Seconds>())
         {
             std::unique_lock lock(m_wait_mutex);
 
-            auto wait_lambda = [this] { return !m_in_queue.empty() || !m_notifications.empty(); };
+            auto wait_lambda = [this] { return stop_waiting_condition(); };
 
-            m_wait_until_messages.wait(lock, wait_lambda);
+            if (wait_time.has_value())
+                m_wait_until_messages.wait_for(lock, wait_time.value(), wait_lambda);
+            else
+                m_wait_until_messages.wait(lock, wait_lambda);
         }
 
         template <typename Func_type>
@@ -174,8 +185,43 @@ namespace Net
                 m_asio_context.run();
         }
 
+        void handle_check_connections_delay(bool wait, Seconds interval)
+        {
+            using namespace std::chrono;
+
+            steady_clock::time_point time_now = high_resolution_clock::now();
+            auto time_since_last_check = duration_cast<Seconds>(time_now - m_last_connection_check);
+
+            if (wait)
+            {
+                auto wait_time = interval - time_since_last_check;
+                wait_until_has_something_to_do(wait_time);
+
+                if (wait_time > Seconds(0))
+                {
+                    time_now = high_resolution_clock::now();
+                    time_since_last_check = duration_cast<Seconds>(time_now - m_last_connection_check);
+                }
+            }
+
+            if (time_since_last_check >= interval)
+            {
+                check_connections();
+                m_last_connection_check = high_resolution_clock::now();
+            }
+        }
+
+        [[nodiscard]] bool stop_waiting_condition()
+        {
+            const bool has_messages = !m_in_queue.empty();
+            const bool has_notifications = !m_notifications.empty();
+
+            return has_messages || has_notifications;
+        }
+
         virtual void on_new_accepted_message(Id_type type, Message_limits limits) = 0;
         virtual void handle_received_messages(size_t max_messages) = 0;
+        virtual void check_connections(){};
 
         asio::io_context m_asio_context;
 
@@ -184,6 +230,7 @@ namespace Net
 
         std::condition_variable m_wait_until_messages;
         std::mutex m_wait_mutex;
+        std::chrono::steady_clock::time_point m_last_connection_check;
 
         std::unordered_map<Id_type, Message_limits> m_accepted_messages;
         Thread_safe_deque<Owned_message<Id_type>> m_in_queue;
