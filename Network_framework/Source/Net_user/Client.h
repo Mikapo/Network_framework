@@ -51,10 +51,11 @@ namespace Net
 
         void disconnect()
         {
+            this->stop_asio_thread();
+
             if (is_connected())
                 m_connection->disconnect();
 
-            this->stop_asio_thread();
             m_connection.reset();
         }
 

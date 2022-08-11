@@ -75,10 +75,7 @@ namespace Net
                 this->async_send_message_to_connection(client.get(), message);
             else
             {
-                std::scoped_lock lock(m_connections_mutext);
-
-                notify_client_disconnect(client);
-                client.reset();
+                handle_disconnect(client);
                 m_connections.erase(
                     std::remove(m_connections.begin(), m_connections.end(), client), m_connections.end());
             }
@@ -87,8 +84,6 @@ namespace Net
         void send_message_to_all_clients(
             const Net_message<Id_type>& message, Client_connection_ptr ignored_client = nullptr)
         {
-            std::scoped_lock lock(m_connections_mutext);
-
             bool disconnected_clients_exist = false;
 
             for (auto& client : m_connections)
@@ -98,10 +93,9 @@ namespace Net
                     if (client != ignored_client)
                         this->async_send_message_to_connection(client.get(), message);
                 }
-                else
+                else if (client)
                 {
-                    notify_client_disconnect(client);
-                    client.reset();
+                    handle_disconnect(client);
                     disconnected_clients_exist = true;
                 }
             }
@@ -117,7 +111,7 @@ namespace Net
             return true;
         }
 
-        virtual void on_client_disconnect(Client_connection_interface<Id_type> client)
+        virtual void on_client_disconnect(uint32_t id, std::string_view ip)
         {
         }
 
@@ -139,8 +133,6 @@ namespace Net
 
         void handle_new_connection(Protocol::socket socket)
         {
-            std::scoped_lock lock(m_connections_mutext);
-
             const std::string ip = socket.remote_endpoint().address().to_string();
 
             this->notifications_push_back(std::format("Server new connection: {}", ip));
@@ -179,33 +171,33 @@ namespace Net
             });
         }
 
-        void notify_client_disconnect(Client_connection_ptr client)
+        void handle_disconnect(Client_connection_ptr& in_client)
         {
-            this->notifications_push_back(
-                std::format("Client disconnected ip: {} id: {}", client->get_ip(), client->get_id()));
-            on_client_disconnect(Client_connection_interface<Id_type>(client));
+            uint32_t id = in_client->get_id();
+            std::string ip = in_client->get_ip().data();
+
+            in_client.reset();
+
+            this->notifications_push_back(std::format("Client disconnected ip: {} id: {}", ip, id));
+
+            on_client_disconnect(id, ip);
         }
 
         void on_new_accepted_message(Id_type type, Message_limits limits) override
         {
-            std::scoped_lock lock(m_connections_mutext);
-
             for (Client_connection_ptr& connection : m_connections)
                 connection->add_accepted_message(type, limits);
         }
 
         void check_connections() override
         {
-            std::scoped_lock lock(m_connections_mutext);
-
             bool disconnected_clients_exist = false;
 
             for (auto& client : m_connections)
             {
                 if (!client || !client->is_connected())
                 {
-                    notify_client_disconnect(client);
-                    client.reset();
+                    handle_disconnect(client);
                     disconnected_clients_exist = true;
                 }
             }
@@ -216,7 +208,6 @@ namespace Net
         }
 
         std::deque<Client_connection_ptr> m_connections;
-        std::mutex m_connections_mutext;
 
         Protocol::acceptor m_acceptor;
         uint32_t m_id_counter = Client_id_start;

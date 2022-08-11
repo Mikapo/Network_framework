@@ -65,7 +65,7 @@ namespace Net
             return client;
         }
 
-        void on_client_disconnect(Client_connection_interface<Id_type> client) override
+        void on_client_disconnect(uint32_t id, std::string_view ip) override
         {
         }
 
