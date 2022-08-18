@@ -37,6 +37,7 @@ namespace Net
                 if (!reason.empty())
                     broadcast_notification(reason, is_error ? Severity::error : Severity::notification);
 
+                m_socket.shutdown(asio::socket_base::shutdown_both);
                 m_socket.close();
             }
         }
@@ -175,7 +176,7 @@ namespace Net
                         async_read_body();
                     }
                     else
-                        disconnect("Error on reading header likely because lost connection", true);
+                        disconnect(error.message(), true);
                 });
         }
 
@@ -191,7 +192,7 @@ namespace Net
                         async_read_header();
                     }
                     else
-                        disconnect("Error on reading body", true);
+                        disconnect(error.message(), true);
                 });
         }
 
@@ -213,7 +214,7 @@ namespace Net
                         }
                     }
                     else
-                        disconnect("Error on writing header", true);
+                        disconnect(error.message(), true);
                 });
         }
 
@@ -230,7 +231,7 @@ namespace Net
                             async_write_header();
                     }
                     else
-                        disconnect("Error on writing body", true);
+                        disconnect(error.message(), true);
                 });
         }
 

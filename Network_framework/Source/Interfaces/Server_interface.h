@@ -49,10 +49,10 @@ namespace Net
         }
 
         void update(
-            size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false,
+            size_t max_handled_items = std::numeric_limits<size_t>::max(), bool wait = false,
             std::optional<Seconds> check_connections_interval = std::optional<Seconds>())
         {
-            this->Underlying::update(max_messages, wait, check_connections_interval);
+            this->Underlying::update(max_handled_items, wait, check_connections_interval);
         }
 
         void add_accepted_message(Id_type type, uint32_t min = 0, uint32_t max = std::numeric_limits<uint32_t>::max())
@@ -73,7 +73,7 @@ namespace Net
         {
         }
 
-        void on_notification(std::string_view notification, Severity severity = Severity::notification) override
+        void on_notification(std::string_view notification, Severity severity) override
         {
         }
     };

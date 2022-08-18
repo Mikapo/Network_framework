@@ -34,6 +34,7 @@ private:
 
     void on_notification(std::string_view message, Net::Severity severity) override
     {
+        std::cout << message << "\n";
     }
 };
 

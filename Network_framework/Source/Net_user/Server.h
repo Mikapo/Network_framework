@@ -59,22 +59,22 @@ namespace Net
         }
 
         void update(
-            size_t max_messages, bool wait, std::optional<std::chrono::seconds> check_connections_interval) override
+            size_t max_handled_items, bool wait, std::optional<std::chrono::seconds> check_connections_interval) override
         {
-            Net_user<Id_type>::update(max_messages, wait, check_connections_interval);
+            Net_user<Id_type>::update(max_handled_items, wait, check_connections_interval);
 
-            handle_received_messages(max_messages);
-            handle_new_connections(max_messages);
+            handle_received_messages(max_handled_items);
+            handle_new_connections(max_handled_items);
         }
 
         void ban_ip(const std::string& new_banned_ip)
         {
-            m_banned_ip.insert(ip);
+            m_banned_ip.insert(new_banned_ip);
         }
 
-        void unban_ip(const std::string& ip)
+        void unban_ip(const std::string& new_unbanned_ip)
         {
-            m_banned_ip.erase(ip);
+            m_banned_ip.erase(new_unbanned_ip);
         }
 
         void send_message_to_client(Client_connection_ptr client, const Net_message<Id_type>& message)
@@ -106,6 +106,13 @@ namespace Net
         }
 
     protected:
+        bool should_stop_wait() noexcept override
+        {
+            bool parent_conditions = Net_user<Id_type>::should_stop_wait();
+
+            return parent_conditions || !m_new_connections.empty();
+        }
+
         virtual bool on_client_connect(Client_connection_interface<Id_type> client)
         {
             return true;
@@ -168,7 +175,10 @@ namespace Net
                     this->notifications_push_back(std::format("Server new connection: {}", ip));
 
                     if (!m_banned_ip.contains(ip))
+                    {
                         m_new_connections.push_back(std::move(socket));
+                        this->notify_wait();
+                    }
                     else
                         this->notifications_push_back(std::format("Client with ip {} is banned", ip));
                 }
@@ -210,7 +220,7 @@ namespace Net
             {
                 Client_connection_ptr client = *it;
 
-                if (client->is_connected())
+                if (!client->is_connected())
                     it = remove_connection(it);
                 else
                     ++it;

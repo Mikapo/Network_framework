@@ -89,7 +89,7 @@ void run_server()
     constexpr size_t max_messages = 10;
 
     while (true)
-        server.update(max_messages, true, std::chrono::seconds(10));
+        server.update(max_messages, true, std::chrono::seconds(60));
 }
 
 int main()
