@@ -15,7 +15,7 @@ namespace Net
         using Server_connection = Server_connection<Id_type>;
         using Server_connection_ptr = std::shared_ptr<Server_connection>;
 
-        Client() noexcept : m_socket(this->create_socket())
+        Client() noexcept
         {
         }
 
@@ -67,6 +67,14 @@ namespace Net
             return false;
         }
 
+        void update(
+            size_t max_messages, bool wait, std::optional<std::chrono::seconds> check_connections_interval) override
+        {
+            Net_user<Id_type>::update(max_messages, wait, check_connections_interval);
+
+            handle_received_messages(max_messages);
+        }
+
         void send_message(const Net_message<Id_type>& message)
         {
             if (is_connected())
@@ -79,7 +87,7 @@ namespace Net
         }
 
     private:
-        void handle_received_messages(size_t max_messages) override
+        void handle_received_messages(size_t max_messages)
         {
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
@@ -94,7 +102,6 @@ namespace Net
                 m_connection->add_accepted_message(type, limits);
         }
 
-        Protocol::socket m_socket;
         Server_connection_ptr m_connection;
     };
 } // namespace Net

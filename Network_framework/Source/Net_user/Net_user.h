@@ -33,7 +33,7 @@ namespace Net
             on_new_accepted_message(type, limits);
         }
 
-        void update(
+        virtual void update(
             size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false,
             std::optional<Seconds> check_connections_interval = std::optional<Seconds>())
         {
@@ -41,8 +41,6 @@ namespace Net
                 handle_check_connections_delay(wait, check_connections_interval.value());
             else if (wait)
                 wait_until_has_something_to_do();
-
-            handle_received_messages(max_messages);
 
             for (size_t i = 0; i < max_messages && !m_notifications.empty(); ++i)
             {
@@ -66,9 +64,9 @@ namespace Net
             return m_in_queue.pop_back();
         }
 
-        void in_queue_push_back(const Owned_message<Id_type>& message)
+        void in_queue_push_back(Owned_message<Id_type> message)
         {
-            m_in_queue.push_back(message);
+            m_in_queue.push_back(std::move(message));
             m_wait_until_messages.notify_one();
         }
 
@@ -111,7 +109,7 @@ namespace Net
             std::shared_ptr new_connection = std::make_shared<Connection_type>(std::move(socket));
 
             new_connection->set_on_message_received_callback(
-                [this](const Owned_message<Id_type>& message) { on_message_received(message); });
+                [this](Owned_message<Id_type> message) { on_message_received(std::move(message)); });
 
             new_connection->set_notification_callback(
                 [this](const std::string& message, Severity severity) { notifications_push_back(message, severity); });
@@ -167,9 +165,9 @@ namespace Net
             return m_accepted_messages;
         }
 
-        void on_message_received(const Owned_message<Id_type>& message)
+        void on_message_received(Owned_message<Id_type> message)
         {
-            this->in_queue_push_back(message);
+            in_queue_push_back(std::move(message));
         }
 
     private:
@@ -220,7 +218,6 @@ namespace Net
         }
 
         virtual void on_new_accepted_message(Id_type type, Message_limits limits) = 0;
-        virtual void handle_received_messages(size_t max_messages) = 0;
         virtual void check_connections(){};
 
         asio::io_context m_asio_context;

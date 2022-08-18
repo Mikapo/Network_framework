@@ -21,10 +21,10 @@ namespace Net
         }
 
     private:
-        void on_message_received(const Net_message<Id_type>& message) override
+        void on_message_received(Net_message<Id_type> message) override
         {
-            Owned_message<Id_type> owned_message(message, nullptr);
-            this->broadcast_on_message_received(owned_message);
+            Owned_message<Id_type> owned_message(std::move(message), nullptr);
+            this->broadcast_on_message_received(std::move(owned_message));
         }
 
         std::function<void(const Net_message<Id_type>&)> m_on_message_received_callback;

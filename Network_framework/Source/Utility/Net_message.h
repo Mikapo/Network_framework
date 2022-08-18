@@ -4,6 +4,7 @@
 #include <ostream>
 #include <span>
 #include <stdexcept>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -15,12 +16,16 @@ namespace Net
     template <Id_concept Id_type>
     class Net_connection;
 
+    using Header_size_type = uint64_t;
+
     template <Id_concept Id_type>
     struct Net_message_header
     {
-        uint64_t m_validation_key = VALIDATION_KEY;
+        constexpr static uint64_t CONSTANT_VALIDATION_KEY = 9970951313928774000;
+
+        uint64_t m_validation_key = CONSTANT_VALIDATION_KEY;
         Id_type m_id = {};
-        uint32_t m_size = 0;
+        Header_size_type m_size = 0;
 
         bool operator==(const Net_message_header& other) const noexcept
         {
@@ -33,10 +38,14 @@ namespace Net
         }
     };
 
+    template <typename T>
+    concept Net_message_data_concept = std::is_standard_layout_v<T>;
+
     template <Id_concept Id_type>
     class Net_message
     {
     public:
+        using Size_type = uint64_t;
         friend Net_connection<Id_type>;
 
         friend std::ostream& operator<<(std::ostream& stream, const Net_message& message)
@@ -46,13 +55,13 @@ namespace Net
             return stream;
         }
 
-        template <typename Data_type>
-        Net_message& push_back(const Data_type& data) requires(std::is_standard_layout_v<Data_type>)
+        template <Net_message_data_concept Data_type>
+        Net_message& push_back(const Data_type& data)
         {
             const size_t size = m_body.size();
             const size_t new_size = size + sizeof(Data_type);
 
-            if (new_size > std::numeric_limits<uint32_t>::max())
+            if (new_size > std::numeric_limits<Header_size_type>::max())
                 throw std::length_error("storing too much data to message");
 
             resize_body(new_size);
@@ -60,7 +69,7 @@ namespace Net
             const std::span body_span = {m_body.data(), m_body.size()};
             std::memcpy(&body_span[size], &data, sizeof(Data_type));
 
-            m_header.m_size = static_cast<uint32_t>(m_body.size());
+            m_header.m_size = static_cast<Header_size_type>(m_body.size());
             return *this;
         }
 
@@ -76,8 +85,8 @@ namespace Net
             return *this;
         }
 
-        template <typename Data_type>
-        Net_message& extract(Data_type& data) requires(std::is_standard_layout_v<Data_type>)
+        template <Net_message_data_concept Data_type>
+        Net_message& extract(Data_type& data)
         {
             if (sizeof(Data_type) > m_body.size())
                 throw std::length_error("not enough data to extract");
@@ -88,7 +97,7 @@ namespace Net
             std::memcpy(&data, &body_span[new_size], sizeof(Data_type));
 
             resize_body(new_size);
-            m_header.m_size = static_cast<uint32_t>(m_body.size());
+            m_header.m_size = static_cast<Header_size_type>(m_body.size());
             return *this;
         }
 
@@ -99,8 +108,7 @@ namespace Net
             using Type = std::remove_reference_t<decltype(*begin)>;
             constexpr size_t type_size = sizeof(Type);
 
-            size_t amount = 0;
-            for (; begin != end; ++begin)
+            for (size_t amount = 0; begin != end; ++begin, ++amount)
             {
                 if (m_body.size() < type_size || amount > max_amount)
                     break;
@@ -109,41 +117,53 @@ namespace Net
                 extract(value);
 
                 *begin = std::move(value);
-
-                ++amount;
             }
         }
 
-        std::string extract_as_string(size_t string_size = std::numeric_limits<size_t>::max())
+        // pushes size of string as last value in uint64_t format
+        void push_back_string(std::string_view string)
         {
+            push_back_from_container(string.begin(), string.end());
+            push_back(static_cast<Size_type>(string.size()));
+        }
+
+        // excepts first value to be uint64_t of size of string
+        std::string extract_as_string()
+        {
+            Size_type string_size;
+            extract(string_size);
+
+            if (string_size > m_body.size())
+            {
+                push_back(string_size);
+                throw std::logic_error("Invalid string size");
+            }
+
             std::string output;
-            const size_t size = std::min(string_size, m_body.size());
-            output.resize(size);
+            output.resize(string_size);
             extract_to_container(output.rbegin(), output.rend());
 
             return output;
         }
 
-        template <typename Data_type>
-        friend Net_message& operator<<(Net_message& message, const Data_type& data) requires(
-            std::is_standard_layout_v<Data_type>)
+        template <Net_message_data_concept Data_type>
+        friend Net_message& operator<<(Net_message& message, const Data_type& data)
         {
             return message.push_back(data);
         }
 
-        template <typename Data_type>
-        friend Net_message& operator>>(Net_message& message, Data_type& data) requires(
-            std::is_standard_layout_v<Data_type>)
+        template <Net_message_data_concept Data_type>
+        friend Net_message& operator>>(Net_message& message, Data_type& data)
         {
             return message.extract(data);
         }
 
-        bool operator==(const Net_message& other) const noexcept
+        [[nodiscard]] bool operator==(const Net_message& other) const noexcept
         {
             return m_header == other.m_header && m_body == other.m_body;
         }
 
-        bool operator!=(const Net_message& other) const noexcept
+        [[nodiscard]] bool operator!=(const Net_message& other) const noexcept
         {
             return !(*this == other);
         }
@@ -183,8 +203,8 @@ namespace Net
     {
         using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
 
-        Owned_message(const Net_message<Id_type>& message, Client_connection_ptr owner)
-            : m_message(message), m_owner(owner)
+        Owned_message(Net_message<Id_type> message, Client_connection_ptr owner)
+            : m_message(std::move(message)), m_owner(owner)
         {
         }
 
@@ -193,12 +213,12 @@ namespace Net
             return stream << message.m_message;
         }
 
-        bool operator==(const Owned_message& other) const noexcept
+        [[nodiscard]] bool operator==(const Owned_message& other) const noexcept
         {
             return m_owner == other.m_owner && m_message == other.m_message;
         }
 
-        bool operator!=(const Owned_message& other) const noexcept
+        [[nodiscard]] bool operator!=(const Owned_message& other) const noexcept
         {
             return !(*this == other);
         }

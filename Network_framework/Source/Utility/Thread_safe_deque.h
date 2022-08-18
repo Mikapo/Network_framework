@@ -32,13 +32,13 @@ namespace Net
             return m_queue.back();
         }
 
-        void push_front(const T& item)
+        void push_front(T item)
         {
             std::scoped_lock lock(m_mutex);
             return m_queue.push_front(std::move(item));
         }
 
-        void push_back(const T& item)
+        void push_back(T item)
         {
             std::scoped_lock lock(m_mutex);
             return m_queue.push_back(std::move(item));

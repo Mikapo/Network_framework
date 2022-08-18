@@ -32,7 +32,7 @@ namespace Net
 
         void update(size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false)
         {
-            this->Underlying::update(max_messages, wait);
+            this->Underlying::update(max_messages, wait, std::optional<std::chrono::seconds>());
         }
 
         void add_accepted_message(Id_type type, uint32_t min = 0, uint32_t max = std::numeric_limits<uint32_t>::max())

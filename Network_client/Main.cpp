@@ -49,7 +49,7 @@ void send_thread()
 
         Net::Net_message<Message_id> net_message;
         net_message.set_id(Message_id::message);
-        net_message.push_back_from_container(message.begin(), message.end());
+        net_message.push_back_string(message);
 
         messages.push_back(net_message);
     }
@@ -63,7 +63,7 @@ void send_name(Chat_client& client)
 
     Net::Net_message<Message_id> message;
     message.set_id(Message_id::set_name);
-    message.push_back_from_container(username.begin(), username.end());
+    message.push_back_string(username);
 
     client.send_message(message);
 }

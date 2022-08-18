@@ -24,6 +24,4 @@ namespace Net
         notification,
         error
     };
-
-    constexpr uint64_t VALIDATION_KEY = 9970951313928774000;
 } // namespace Net

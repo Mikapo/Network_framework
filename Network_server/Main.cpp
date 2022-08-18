@@ -34,14 +34,14 @@ private:
 
             Net::Net_message<Message_id> net_message;
             net_message.set_id(Message_id::server_message);
-            net_message.push_back_from_container(output.begin(), output.end());
+            net_message.push_back_string(output);
             send_message_to_client(client, net_message);
 
             const std::string join_message = std::format("{} joined the chat", name);
 
             Net::Net_message<Message_id> join_net_message;
             join_net_message.set_id(Message_id::server_message);
-            join_net_message.push_back_from_container(join_message.begin(), join_message.end());
+            join_net_message.push_back_string(join_message);
             send_message_to_all_clients(join_net_message, client);
 
             break;
@@ -60,7 +60,7 @@ private:
 
             Net::Net_message<Message_id> net_message;
             net_message.set_id(Message_id::server_message);
-            net_message.push_back_from_container(output_string.begin(), output_string.end());
+            net_message.push_back_string(output_string);
 
             std::cout << output_string << "\n";
 

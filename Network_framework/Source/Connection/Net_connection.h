@@ -112,10 +112,10 @@ namespace Net
                 });
         }
 
-        void broadcast_on_message_received(const Owned_message<Id_type>& message)
+        void broadcast_on_message_received(Owned_message<Id_type> message)
         {
             if (m_on_message_received_callback)
-                m_on_message_received_callback(message);
+                m_on_message_received_callback(std::move(message));
         }
 
         void broadcast_notification(const std::string& string, Severity severity)
@@ -133,7 +133,7 @@ namespace Net
     private:
         [[nodiscard]] bool validate_header(Net_message_header<Id_type> header) const noexcept
         {
-            if (header.m_validation_key != VALIDATION_KEY)
+            if (header.m_validation_key != Net_message_header<Id_type>::CONSTANT_VALIDATION_KEY)
                 return false;
 
             auto found_limits = m_accepted_messages.find(header.m_id);
@@ -165,7 +165,8 @@ namespace Net
                         if (m_temp_message.m_header.m_size == 0)
                         {
                             m_temp_message.resize_body(0);
-                            on_message_received(m_temp_message);
+                            on_message_received(std::move(m_temp_message));
+                            m_temp_message = Net_message<Id_type>();
                             async_read_header();
                             return;
                         }
@@ -185,7 +186,8 @@ namespace Net
                 [this](asio::error_code error, size_t size) {
                     if (!error)
                     {
-                        on_message_received(m_temp_message);
+                        on_message_received(std::move(m_temp_message));
+                        m_temp_message = Net_message<Id_type>();
                         async_read_header();
                     }
                     else
@@ -232,7 +234,7 @@ namespace Net
                 });
         }
 
-        virtual void on_message_received(const Net_message<Id_type>& message) = 0;
+        virtual void on_message_received(Net_message<Id_type> message) = 0;
 
         Protocol::socket m_socket;
         bool m_is_waiting_for_messages = false;
@@ -243,6 +245,6 @@ namespace Net
         std::unordered_map<Id_type, Message_limits> m_accepted_messages;
 
         std::function<void(const std::string&, Severity)> m_notification_callback;
-        std::function<void(const Owned_message<Id_type>&)> m_on_message_received_callback;
+        std::function<void(Owned_message<Id_type>)> m_on_message_received_callback;
     };
 } // namespace Net
