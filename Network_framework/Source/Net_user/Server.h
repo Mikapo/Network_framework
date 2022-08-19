@@ -44,22 +44,22 @@ namespace Net
             }
             catch (const std::exception& exception)
             {
-                this->on_notification(std::format("Server start error: {}", exception.what()), Severity::error);
+                this->notifications_push_back(std::format("Server start error: {}", exception.what()), Severity::error);
                 return false;
             }
 
-            this->on_notification("Server has been started");
+            this->notifications_push_back("Server has been started");
             return true;
         }
 
         void stop()
         {
             this->stop_asio_thread();
-            this->on_notification("Server has been stopped");
+            this->notifications_push_back("Server has been stopped");
         }
 
-        void update(
-            size_t max_handled_items, bool wait, std::optional<std::chrono::seconds> check_connections_interval) override
+        void update(size_t max_handled_items, bool wait, std::optional<std::chrono::seconds> check_connections_interval)
+            override
         {
             Net_user<Id_type>::update(max_handled_items, wait, check_connections_interval);
 
@@ -88,22 +88,26 @@ namespace Net
         void send_message_to_all_clients(
             const Net_message<Id_type>& message, Client_connection_ptr ignored_client = nullptr)
         {
-            auto it = m_connections.begin();
-            while (it != m_connections.end())
+            auto connections_iterator = m_connections.begin();
+            while (connections_iterator != m_connections.end())
             {
-                Client_connection_ptr client = *it;
+                Client_connection_ptr client = *connections_iterator;
 
                 if (client && client->is_connected())
                 {
                     if (client != ignored_client)
                         this->async_send_message_to_connection(client.get(), message);
 
-                    ++it;
+                    ++connections_iterator;
                 }
                 else if (client)
-                    it = remove_connection(it);
+                    connections_iterator = remove_connection(connections_iterator);
             }
         }
+
+        Delegate<Client_connection_interface<Id_type>, bool&> m_on_client_connect;
+        Delegate<uint32_t, std::string_view> m_on_client_disconnect;
+        Delegate<Client_connection_interface<Id_type>, Net_message<Id_type>> m_on_message;
 
     protected:
         bool should_stop_wait() noexcept override
@@ -113,28 +117,14 @@ namespace Net
             return parent_conditions || !m_new_connections.empty();
         }
 
-        virtual bool on_client_connect(Client_connection_interface<Id_type> client)
-        {
-            return true;
-        }
-
-        virtual void on_client_disconnect(uint32_t id, std::string_view ip)
-        {
-        }
-
-        virtual void on_message(Client_connection_interface<Id_type> client, Net_message<Id_type> message)
-        {
-        }
-
     private:
         void handle_received_messages(size_t max_messages)
         {
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
-                Owned_message<Id_type> message = this->in_queue_pop_front();
-                Client_connection_interface<Id_type> connection_interface(message.m_owner);
-
-                on_message(connection_interface, std::move(message.m_message));
+                Owned_message<Id_type> owned_message = this->in_queue_pop_front();
+                Client_connection_interface<Id_type> connection_interface(owned_message.m_owner);
+                m_on_message.broadcast(connection_interface, std::move(owned_message.m_message));
             }
         }
 
@@ -151,7 +141,11 @@ namespace Net
 
                 Client_connection_ptr new_connection = this->create_connection<Client_connection>(std::move(socket));
 
-                if (on_client_connect(Client_connection_interface<Id_type>(new_connection)))
+                bool client_accepted = true;
+                m_on_client_connect.broadcast(
+                    Client_connection_interface<Id_type>(new_connection), std::ref(client_accepted));
+
+                if (client_accepted)
                 {
                     const uint32_t id_for_client = m_id_counter++;
 
@@ -202,7 +196,7 @@ namespace Net
 
             this->notifications_push_back(std::format("Client disconnected ip: {} id: {}", ip, id));
 
-            on_client_disconnect(id, ip);
+            m_on_client_disconnect.broadcast(id, ip);
 
             return next_it;
         }
@@ -215,15 +209,15 @@ namespace Net
 
         void check_connections() override
         {
-            auto it = m_connections.begin();
-            while (it != m_connections.end())
+            auto connections_iterator = m_connections.begin();
+            while (connections_iterator != m_connections.end())
             {
-                Client_connection_ptr client = *it;
+                Client_connection_ptr client = *connections_iterator;
 
                 if (!client->is_connected())
-                    it = remove_connection(it);
+                    connections_iterator = remove_connection(connections_iterator);
                 else
-                    ++it;
+                    ++connections_iterator;
             }
         }
 

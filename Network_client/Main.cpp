@@ -1,4 +1,4 @@
-#include "Net_framework.h"
+#include "Net_user/Client.h"
 #include <iostream>
 #include <string>
 
@@ -9,37 +9,24 @@ enum class Message_id : uint8_t
     server_message
 };
 
-class Chat_client : public Net::Client_interface<Message_id>
-{
-public:
-    Chat_client()
-    {
-        add_accepted_message(Message_id::server_message);
-    }
-
-private:
-    void on_message(Net::Net_message<Message_id> message) override
-    {
-        switch (message.get_id())
-        {
-        case Message_id::server_message: {
-            const std::string string = message.extract_as_string();
-            std::cout << string << "\n";
-        }
-
-        default:
-            break;
-        }
-    }
-
-    void on_notification(std::string_view message, Net::Severity severity) override
-    {
-        std::cout << message << "\n";
-    }
-};
-
 bool send_thread_exit_flag = false;
 Net::Thread_safe_deque<Net::Net_message<Message_id>> messages;
+Net::Client<Message_id> client;
+
+void client_on_message(Net::Net_message<Message_id> message)
+{
+    switch (message.get_id())
+    {
+    case Message_id::server_message: {
+        const std::string chat_message = message.extract_as_string();
+        std::cout << chat_message << "\n";
+        break;
+    }
+    default:
+        client.disconnect();
+        break;
+    }
+}
 
 void send_thread()
 {
@@ -56,7 +43,7 @@ void send_thread()
     }
 }
 
-void send_name(Chat_client& client)
+void send_name()
 {
     std::cout << "Please enter your username: ";
     std::string username;
@@ -69,7 +56,7 @@ void send_name(Chat_client& client)
     client.send_message(message);
 }
 
-void main_loop(Chat_client& client)
+void main_loop()
 {
     while (client.is_connected())
     {
@@ -89,17 +76,18 @@ void start_client()
     std::string port;
     std::getline(std::cin, port);
 
-    Chat_client client;
+    client.add_accepted_message(Message_id::server_message);
+    client.m_on_message.set_function(client_on_message);
     client.connect(ip, port);
 
     if (client.is_connected())
     {
         std::cout << "Connected succefully \n";
-        send_name(client);
+        send_name();
 
         std::thread thread = std::thread(send_thread);
 
-        main_loop(client);
+        main_loop();
 
         send_thread_exit_flag = true;
 

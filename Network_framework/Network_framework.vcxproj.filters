@@ -66,12 +66,6 @@
     <ClInclude Include="Source\Interfaces\Client_connection_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Interfaces\Client_interface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Interfaces\Server_interface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Net_user\Client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -90,8 +84,13 @@
     <ClInclude Include="Source\Utility\Thread_safe_deque.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Net_framework.h">
+    <ClInclude Include="Source\Utility\Delegate.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\Utility\Delegate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

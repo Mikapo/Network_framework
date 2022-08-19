@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Utility/Delegate.h"
 #include "../Utility/Net_common.h"
 #include "../Utility/Net_message.h"
 #include "../Utility/Thread_safe_deque.h"
@@ -35,7 +36,7 @@ namespace Net
             if (is_connected())
             {
                 if (!reason.empty())
-                    broadcast_notification(reason, is_error ? Severity::error : Severity::notification);
+                    m_on_notification.broadcast(reason, is_error ? Severity::error : Severity::notification);
 
                 m_socket.shutdown(asio::socket_base::shutdown_both);
                 m_socket.close();
@@ -62,18 +63,6 @@ namespace Net
                 async_write_header();
         }
 
-        template <typename Func_type>
-        void set_notification_callback(const Func_type& func)
-        {
-            m_notification_callback = func;
-        }
-
-        template <typename Func_type>
-        void set_on_message_received_callback(const Func_type& func)
-        {
-            m_on_message_received_callback = func;
-        }
-
         void add_accepted_message(Id_type type, Message_limits limits)
         {
             m_accepted_messages[type] = limits;
@@ -83,6 +72,9 @@ namespace Net
         {
             m_accepted_messages = accepted_messages;
         }
+
+        Delegate<const std::string&, Severity> m_on_notification;
+        Delegate<Owned_message<Id_type>> m_on_message;
 
     protected:
         void start_waiting_for_messages()
@@ -106,23 +98,11 @@ namespace Net
                     if (!error)
                     {
                         update_ip();
-                        broadcast_notification(
+                        m_on_notification.broadcast(
                             std::format("Connected sucesfully to {}", get_ip()), Severity::notification);
                         this->start_waiting_for_messages();
                     }
                 });
-        }
-
-        void broadcast_on_message_received(Owned_message<Id_type> message)
-        {
-            if (m_on_message_received_callback)
-                m_on_message_received_callback(std::move(message));
-        }
-
-        void broadcast_notification(const std::string& string, Severity severity)
-        {
-            if (m_notification_callback)
-                m_notification_callback(string, severity);
         }
 
         void update_ip()
@@ -235,17 +215,23 @@ namespace Net
                 });
         }
 
-        virtual void on_message_received(Net_message<Id_type> message) = 0;
+        void on_message_received(Net_message<Id_type> message) const
+        {
+            Owned_message<Id_type> owned_message = create_owned_message(std::move(message));
+            m_on_message.broadcast(std::move(owned_message));
+        }
+
+        [[nodiscard]] virtual Owned_message<Id_type> create_owned_message(Net_message<Id_type> message) const
+        {
+            return Owned_message<Id_type>(std::move(message), nullptr);
+        }
 
         Protocol::socket m_socket;
-        bool m_is_waiting_for_messages = false;
         std::string m_ip = "0.0.0.0";
+        bool m_is_waiting_for_messages = false;
 
         Net_message<Id_type> m_temp_message;
         Thread_safe_deque<Net_message<Id_type>> m_out_queue;
         std::unordered_map<Id_type, Message_limits> m_accepted_messages;
-
-        std::function<void(const std::string&, Severity)> m_notification_callback;
-        std::function<void(Owned_message<Id_type>)> m_on_message_received_callback;
     };
 } // namespace Net

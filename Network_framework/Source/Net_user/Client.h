@@ -68,7 +68,9 @@ namespace Net
         }
 
         void update(
-            size_t max_messages, bool wait, std::optional<std::chrono::seconds> check_connections_interval) override
+            size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false,
+            std::optional<std::chrono::seconds> check_connections_interval =
+                std::optional<std::chrono::seconds>()) override
         {
             Net_user<Id_type>::update(max_messages, wait, check_connections_interval);
 
@@ -81,10 +83,7 @@ namespace Net
                 this->async_send_message_to_connection(m_connection.get(), message);
         }
 
-    protected:
-        virtual void on_message(Net_message<Id_type> message)
-        {
-        }
+        Delegate<Net_message<Id_type>> m_on_message;
 
     private:
         void handle_received_messages(size_t max_messages)
@@ -92,7 +91,7 @@ namespace Net
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
                 auto message = this->in_queue_pop_front();
-                on_message(std::move(message.m_message));
+                m_on_message.broadcast(std::move(message.m_message));
             }
         }
 

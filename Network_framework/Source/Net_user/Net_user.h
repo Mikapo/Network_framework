@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Connection/Net_connection.h"
+#include "../Utility/Delegate.h"
 #include "../Utility/Net_common.h"
 #include "../Utility/Net_message.h"
 #include "../Utility/Thread_safe_deque.h"
@@ -26,7 +27,7 @@ namespace Net
         Net_user& operator=(const Net_user&) = delete;
         Net_user& operator=(Net_user&&) = delete;
 
-        void add_accepted_message(Id_type type, uint32_t min, uint32_t max)
+        void add_accepted_message(Id_type type, uint32_t min = 0, uint32_t max = std::numeric_limits<uint32_t>::max())
         {
             const Message_limits limits = {.m_min = min, .m_max = max};
             m_accepted_messages[type] = limits;
@@ -44,16 +45,14 @@ namespace Net
 
             for (size_t i = 0; i < max_handled_items && !m_notifications.empty(); ++i)
             {
-                Notification notification = m_notifications.pop_front();
-                on_notification(notification.m_message, notification.m_severity);
+                const Notification notification = m_notifications.pop_front();
+                m_on_notification.broadcast(notification.m_message, notification.m_severity);
             }
         }
 
-    protected:
-        virtual void on_notification(std::string_view notification, Severity severity = Severity::notification)
-        {
-        }
+        Delegate<std::string_view, Severity> m_on_notification;
 
+    protected:
         bool is_in_queue_empty()
         {
             return m_in_queue.empty();
@@ -77,6 +76,9 @@ namespace Net
 
         void notifications_push_back(const std::string& message, Severity severity = Severity::notification)
         {
+            if (!m_on_notification.function_has_been_set())
+                return;
+
             Notification notification = {.m_message = message, .m_severity = severity};
             m_notifications.push_back(std::move(notification));
             notify_wait();
@@ -113,10 +115,10 @@ namespace Net
         {
             std::shared_ptr new_connection = std::make_shared<Connection_type>(std::move(socket));
 
-            new_connection->set_on_message_received_callback(
+            new_connection->m_on_message.set_function(
                 [this](Owned_message<Id_type> message) { on_message_received(std::move(message)); });
 
-            new_connection->set_notification_callback(
+            new_connection->m_on_notification.set_function(
                 [this](const std::string& message, Severity severity) { notifications_push_back(message, severity); });
 
             new_connection->set_accepted_messages(get_current_accepted_messages());

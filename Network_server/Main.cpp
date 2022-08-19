@@ -1,6 +1,7 @@
-#include "Net_framework.h"
+#include "Net_user/Server.h"
+#include <format>
 #include <iostream>
-
+#include <string>
 #include <unordered_map>
 
 enum class Message_id : uint8_t
@@ -10,98 +11,68 @@ enum class Message_id : uint8_t
     server_message
 };
 
-class Chat_server : public Net::Server_interface<Message_id>
+std::unordered_map<uint32_t, std::string> names;
+
+constexpr uint16_t port = 1234;
+Net::Server<Message_id> server(port);
+
+void server_notification(std::string_view notification, Net::Severity severity)
 {
-public:
-    explicit Chat_server(uint16_t port) : Server_interface<Message_id>(port)
-    {
-        add_accepted_message(Message_id::set_name);
-        add_accepted_message(Message_id::message);
-    }
+    std::cout << notification << "\n";
+}
 
-private:
-    void on_message(Net::Client_connection_interface<Message_id> client, Net::Net_message<Message_id> message) override
-    {
-        switch (message.get_id())
-        {
-        case Message_id::set_name: {
-            const std::string name = message.extract_as_string();
-            m_names[client.get_id()] = name;
-
-            std::cout << "Set name " << name << " for client " << client.get_id() << "\n";
-
-            const std::string output = "Name accepted you can send messages now";
-
-            Net::Net_message<Message_id> net_message;
-            net_message.set_id(Message_id::server_message);
-            net_message.push_back_string(output);
-            send_message_to_client(client, net_message);
-
-            const std::string join_message = std::format("{} joined the chat", name);
-
-            Net::Net_message<Message_id> join_net_message;
-            join_net_message.set_id(Message_id::server_message);
-            join_net_message.push_back_string(join_message);
-            send_message_to_all_clients(join_net_message, client);
-
-            break;
-        }
-        case Message_id::message: {
-            auto found_name = m_names.find(client.get_id());
-
-            if (found_name == m_names.end())
-            {
-                client.disconnect();
-                break;
-            }
-
-            const std::string message_string = message.extract_as_string();
-            const std::string output_string = std::format("[{}]: {}", found_name->second, message_string);
-
-            Net::Net_message<Message_id> net_message;
-            net_message.set_id(Message_id::server_message);
-            net_message.push_back_string(output_string);
-
-            std::cout << output_string << "\n";
-
-            send_message_to_all_clients(net_message, client);
-            break;
-        }
-        default:
-            break;
-        }
-    }
-
-    void on_notification(std::string_view notification, Net::Severity severity) override
-    {
-        std::cout << notification << "\n";
-    }
-
-    std::unordered_map<uint32_t, std::string> m_names;
-};
-
-void run_server()
+void on_set_name(Net::Client_connection_interface<Message_id> client, Net::Net_message<Message_id> message)
 {
-    constexpr uint16_t port = 1234;
-    Chat_server server(port);
-    server.start();
+    const std::string name = message.extract_as_string();
+    names[client.get_id()] = name;
+}
 
-    constexpr size_t max_messages = 10;
+void on_chat_message(Net::Client_connection_interface<Message_id> client, Net::Net_message<Message_id> message)
+{
+    const auto found_name = names.find(client.get_id());
 
-    while (true)
-        server.update(max_messages, true, std::chrono::seconds(60));
+    if (found_name == names.end())
+    {
+        client.disconnect();
+        return;
+    }
+
+    const std::string chat_message = message.extract_as_string();
+    const std::string formated_message = std::format("[{}] {}", found_name->second, chat_message);
+
+    Net::Net_message<Message_id> net_message;
+    net_message.set_id(Message_id::server_message);
+    net_message.push_back_string(formated_message);
+
+    server.send_message_to_all_clients(net_message);
+}
+
+void server_on_message(Net::Client_connection_interface<Message_id> client, Net::Net_message<Message_id> message)
+{
+    switch (message.get_id())
+    {
+    case Message_id::set_name:
+        on_set_name(client, std::move(message));
+        break;
+    case Message_id::message:
+        on_chat_message(client, std::move(message));
+        break;
+    default:
+        client.disconnect();
+        break;
+    }
 }
 
 int main()
 {
-    try
-    {
-        run_server();
-    }
-    catch (const std::exception& exception)
-    {
-        std::cout << "Exception: " << exception.what() << "\n";
-    }
+    server.add_accepted_message(Message_id::set_name);
+    server.add_accepted_message(Message_id::message);
 
-    std::cout << "Now exiting server \n";
+    server.m_on_notification.set_function(server_notification);
+    server.m_on_message.set_function(server_on_message);
+
+    server.start();
+
+    while (true)
+        server.update(10, true, std::chrono::seconds(30));
 }

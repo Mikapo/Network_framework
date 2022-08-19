@@ -7,7 +7,7 @@ namespace Net
 {
     template <Id_concept Id_type>
     class Client_connection : public Net_connection<Id_type>,
-                              public std::enable_shared_from_this<Client_connection<Id_type>>
+                              private std::enable_shared_from_this<Client_connection<Id_type>>
     {
     public:
         using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
@@ -32,10 +32,9 @@ namespace Net
         }
 
     private:
-        void on_message_received(Net_message<Id_type> message) override
+        [[nodiscard]] Owned_message<Id_type> create_owned_message(Net_message<Id_type> message)
         {
-            Owned_message<Id_type> owned_message(std::move(message), this->shared_from_this());
-            this->broadcast_on_message_received(std::move(owned_message));
+            return Owned_message<Id_type>(std::move(message), this->shared_from_this());
         }
 
         uint32_t m_id = 0;
