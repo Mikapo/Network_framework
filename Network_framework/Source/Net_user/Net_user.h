@@ -110,10 +110,14 @@ namespace Net
             }
         }
 
-        template <std::derived_from<Net_connection<Id_type>> Connection_type>
-        [[nodiscard]] std::shared_ptr<Connection_type> create_connection(Protocol::socket socket)
+        using Optional_end_points = Net_connection<Id_type>::Optional_end_points;
+
+        [[nodiscard]] std::unique_ptr<Net_connection<Id_type>> create_connection(
+            Protocol::socket socket, uint32_t connection_id,
+            const Optional_end_points& end_points = Optional_end_points())
         {
-            std::shared_ptr new_connection = std::make_shared<Connection_type>(std::move(socket));
+            std::unique_ptr new_connection =
+                std::make_unique<Net_connection<Id_type>>(std::move(socket), connection_id, end_points);
 
             new_connection->m_on_message.set_function(
                 [this](Owned_message<Id_type> message) { on_message_received(std::move(message)); });

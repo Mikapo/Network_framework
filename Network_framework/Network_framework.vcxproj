@@ -141,6 +141,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Source\Utility\Client_information.h" />
     <ClInclude Include="Source\Utility\Delegate.h" />
     <ClInclude Include="Networking\Connection\Client_connection.h" />
     <ClInclude Include="Networking\Connection\Server_connection.h" />
@@ -155,19 +156,14 @@
     <ClInclude Include="Networking\Net_user\Net_user.h" />
     <ClInclude Include="Networking\Net_user\Server.h" />
     <ClInclude Include="Networking\Utility\Thread_safe_deque.h" />
-    <ClInclude Include="Source\Connection\Client_connection.h" />
     <ClInclude Include="Source\Connection\Net_connection.h" />
-    <ClInclude Include="Source\Connection\Server_connection.h" />
-    <ClInclude Include="Source\Interfaces\Client_connection_interface.h" />
     <ClInclude Include="Source\Net_user\Client.h" />
     <ClInclude Include="Source\Net_user\Net_user.h" />
     <ClInclude Include="Source\Net_user\Server.h" />
     <ClInclude Include="Source\Utility\Net_common.h" />
     <ClInclude Include="Source\Utility\Net_message.h" />
+    <ClInclude Include="Source\Utility\Owned_message.h" />
     <ClInclude Include="Source\Utility\Thread_safe_deque.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Source\Utility\Delegate.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

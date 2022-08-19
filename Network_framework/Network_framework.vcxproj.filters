@@ -54,16 +54,7 @@
     <ClInclude Include="Networking\Interfaces\Client_connection_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Connection\Client_connection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Connection\Net_connection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Connection\Server_connection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Interfaces\Client_connection_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Net_user\Client.h">
@@ -87,10 +78,11 @@
     <ClInclude Include="Source\Utility\Delegate.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Source\Utility\Delegate.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
+    <ClInclude Include="Source\Utility\Owned_message.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Utility\Client_information.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,26 +1,20 @@
 #pragma once
 
-#include "../Connection/Client_connection.h"
-#include "../Interfaces/Client_connection_interface.h"
-#include "../Utility/Net_message.h"
+#include "../Utility/Owned_message.h"
 #include "Net_user.h"
 #include <cstdint>
 #include <format>
 #include <limits>
 #include <memory>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace Net
 {
-    constexpr uint32_t Client_id_start = 1000;
-
     template <Id_concept Id_type>
     class Server : public Net_user<Id_type>
     {
     public:
-        using Client_connection = Client_connection<Id_type>;
-        using Client_connection_ptr = std::shared_ptr<Client_connection>;
-
         explicit Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
         {
         }
@@ -77,37 +71,50 @@ namespace Net
             m_banned_ip.erase(new_unbanned_ip);
         }
 
-        void send_message_to_client(Client_connection_ptr client, const Net_message<Id_type>& message)
+        void disconnect_client(uint32_t client_id)
         {
-            if (client && client->is_connected())
-                this->async_send_message_to_connection(client.get(), message);
-            else if (client)
-                remove_connection(m_connections.find(client));
+            auto found_client = m_connections.find(client_id);
+
+            if (found_client != m_connections.end())
+                remove_connection(found_client);
         }
 
-        void send_message_to_all_clients(
-            const Net_message<Id_type>& message, Client_connection_ptr ignored_client = nullptr)
+        void send_message_to_client(uint32_t client_id, const Net_message<Id_type>& message)
+        {
+            auto found_client = m_connections.find(client_id);
+            if (found_client == m_connections.end())
+                return;
+
+            auto& client_ptr = found_client->second;
+
+            if (client_ptr->is_connected())
+                this->async_send_message_to_connection(client_ptr.get(), message);
+            else
+                remove_connection(found_client);
+        }
+
+        void send_message_to_all_clients(const Net_message<Id_type>& message, uint32_t ignored_client = 0)
         {
             auto connections_iterator = m_connections.begin();
             while (connections_iterator != m_connections.end())
             {
-                Client_connection_ptr client = *connections_iterator;
+                const auto& client = connections_iterator->second;
 
-                if (client && client->is_connected())
+                if (client->is_connected())
                 {
-                    if (client != ignored_client)
+                    if (client->get_id() != ignored_client)
                         this->async_send_message_to_connection(client.get(), message);
 
                     ++connections_iterator;
                 }
-                else if (client)
+                else
                     connections_iterator = remove_connection(connections_iterator);
             }
         }
 
-        Delegate<Client_connection_interface<Id_type>, bool&> m_on_client_connect;
-        Delegate<uint32_t, std::string_view> m_on_client_disconnect;
-        Delegate<Client_connection_interface<Id_type>, Net_message<Id_type>> m_on_message;
+        Delegate<const Client_information&, bool&> m_on_client_connect;
+        Delegate<const Client_information&> m_on_client_disconnect;
+        Delegate<const Client_information&, Net_message<Id_type>> m_on_message;
 
     protected:
         bool should_stop_wait() noexcept override
@@ -123,41 +130,38 @@ namespace Net
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
                 Owned_message<Id_type> owned_message = this->in_queue_pop_front();
-                Client_connection_interface<Id_type> connection_interface(owned_message.m_owner);
-                m_on_message.broadcast(connection_interface, std::move(owned_message.m_message));
+                m_on_message.broadcast(
+                    std::move(owned_message.m_client_information), std::move(owned_message.m_message));
             }
         }
 
         void handle_new_connections(size_t max_amount)
         {
             for (size_t i = 0; i < max_amount && !m_new_connections.empty(); ++i)
+                add_connection(m_new_connections.pop_front());
+        }
+
+        void add_connection(Protocol::socket socket)
+        {
+            if (!socket.is_open())
+                return;
+
+            const uint32_t id_for_client = m_id_counter++;
+            const std::string ip = socket.remote_endpoint().address().to_string();
+
+            auto new_connection = this->create_connection(std::move(socket), id_for_client);
+
+            bool client_accepted = true;
+            m_on_client_connect.broadcast(Client_information(id_for_client, ip), client_accepted);
+
+            if (client_accepted)
             {
-                Protocol::socket socket = m_new_connections.pop_front();
-
-                if (!socket.is_open())
-                    continue;
-
-                const std::string ip = socket.remote_endpoint().address().to_string();
-
-                Client_connection_ptr new_connection = this->create_connection<Client_connection>(std::move(socket));
-
-                bool client_accepted = true;
-                m_on_client_connect.broadcast(
-                    Client_connection_interface<Id_type>(new_connection), std::ref(client_accepted));
-
-                if (client_accepted)
-                {
-                    const uint32_t id_for_client = m_id_counter++;
-
-                    m_connections.insert(new_connection);
-                    new_connection->connect_to_client(id_for_client);
-
-                    this->notifications_push_back(
-                        std::format("Client with ip {} was accepted and assigned ip {} to it", ip, id_for_client));
-                }
-                else
-                    this->notifications_push_back(std::format("Connection {} denied", ip));
+                m_connections.emplace(id_for_client, std::move(new_connection));
+                this->notifications_push_back(
+                    std::format("Client with ip {} was accepted and assigned ip {} to it", ip, id_for_client));
             }
+            else
+                this->notifications_push_back(std::format("Connection {} denied", ip));
         }
 
         void async_wait_for_connections()
@@ -187,7 +191,7 @@ namespace Net
         template <typename Connection_it_type>
         auto remove_connection(Connection_it_type connection_it)
         {
-            Client_connection_ptr client = *connection_it;
+            const auto& client = connection_it->second;
 
             const uint32_t id = client->get_id();
             const std::string ip = client->get_ip().data();
@@ -196,15 +200,15 @@ namespace Net
 
             this->notifications_push_back(std::format("Client disconnected ip: {} id: {}", ip, id));
 
-            m_on_client_disconnect.broadcast(id, ip);
+            m_on_client_disconnect.broadcast(Client_information(id, ip));
 
             return next_it;
         }
 
         void on_new_accepted_message(Id_type type, Message_limits limits) override
         {
-            for (Client_connection_ptr client : m_connections)
-                client->add_accepted_message(type, limits);
+            for (auto& client : m_connections)
+                client.second->add_accepted_message(type, limits);
         }
 
         void check_connections() override
@@ -212,7 +216,7 @@ namespace Net
             auto connections_iterator = m_connections.begin();
             while (connections_iterator != m_connections.end())
             {
-                Client_connection_ptr client = *connections_iterator;
+                const auto& client = connections_iterator->second;
 
                 if (!client->is_connected())
                     connections_iterator = remove_connection(connections_iterator);
@@ -221,11 +225,12 @@ namespace Net
             }
         }
 
-        std::unordered_set<Client_connection_ptr> m_connections;
+        std::unordered_map<uint32_t, std::unique_ptr<Net_connection<Id_type>>> m_connections;
         Thread_safe_deque<Protocol::socket> m_new_connections;
 
         Protocol::acceptor m_acceptor;
-        uint32_t m_id_counter = Client_id_start;
+        constexpr static uint32_t FIRST_CLIENT_ID = 1000;
+        uint32_t m_id_counter = FIRST_CLIENT_ID;
 
         std::unordered_set<std::string> m_banned_ip;
     };

@@ -197,33 +197,4 @@ namespace Net
         Net_message_header<Id_type> m_header;
         std::vector<char> m_body = {};
     };
-
-    template <Id_concept Id_type>
-    struct Owned_message
-    {
-        using Client_connection_ptr = std::shared_ptr<Client_connection<Id_type>>;
-
-        Owned_message(Net_message<Id_type> message, Client_connection_ptr owner)
-            : m_message(std::move(message)), m_owner(owner)
-        {
-        }
-
-        friend std::ostream& operator<<(std::ostream& stream, const Owned_message& message)
-        {
-            return stream << message.m_message;
-        }
-
-        [[nodiscard]] bool operator==(const Owned_message& other) const noexcept
-        {
-            return m_owner == other.m_owner && m_message == other.m_message;
-        }
-
-        [[nodiscard]] bool operator!=(const Owned_message& other) const noexcept
-        {
-            return !(*this == other);
-        }
-
-        Net_message<Id_type> m_message;
-        Client_connection_ptr m_owner = nullptr;
-    };
 }; // namespace Net

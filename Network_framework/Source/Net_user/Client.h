@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../Connection/Server_connection.h"
 #include "../Utility/Thread_safe_deque.h"
 #include "Net_user.h"
 #include <cstdint>
@@ -12,9 +11,6 @@ namespace Net
     class Client : public Net_user<Id_type>
     {
     public:
-        using Server_connection = Server_connection<Id_type>;
-        using Server_connection_ptr = std::shared_ptr<Server_connection>;
-
         Client() noexcept
         {
         }
@@ -35,9 +31,7 @@ namespace Net
             {
                 Protocol::resolver resolver = this->create_resolver();
                 auto endpoints = resolver.resolve(host, port);
-
-                m_connection = this->create_connection<Server_connection>(this->create_socket());
-                m_connection->connect_to_server(endpoints);
+                m_connection = this->create_connection(this->create_socket(), 0, endpoints);
                 this->start_asio_thread();
             }
             catch (const std::exception& exception)
@@ -101,6 +95,6 @@ namespace Net
                 m_connection->add_accepted_message(type, limits);
         }
 
-        Server_connection_ptr m_connection;
+        std::unique_ptr<Net_connection<Id_type>> m_connection;
     };
 } // namespace Net

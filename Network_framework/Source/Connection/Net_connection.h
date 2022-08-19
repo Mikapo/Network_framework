@@ -2,11 +2,12 @@
 
 #include "../Utility/Delegate.h"
 #include "../Utility/Net_common.h"
-#include "../Utility/Net_message.h"
+#include "../Utility/Owned_message.h"
 #include "../Utility/Thread_safe_deque.h"
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
 namespace Net
@@ -20,9 +21,21 @@ namespace Net
     class Net_connection
     {
     public:
-        explicit Net_connection(Protocol::socket socket) : m_socket(std::move(socket))
+        using Optional_end_points = std::optional<Protocol::resolver::results_type>;
+
+        explicit Net_connection(
+            Protocol::socket socket, uint32_t connection_id,
+            const Optional_end_points& end_points = Optional_end_points())
+            : m_socket(std::move(socket)), m_id(connection_id)
         {
-            update_ip();
+            if (end_points.has_value())
+                async_connect(end_points.value());
+
+            else if (is_connected())
+            {
+                start_waiting_for_messages();
+                update_ip();
+            }
         }
 
         virtual ~Net_connection() = default;
@@ -48,7 +61,12 @@ namespace Net
             return m_socket.is_open();
         }
 
-        [[nodiscard]] std::string_view get_ip() const
+        [[nodiscard]] uint32_t get_id() const noexcept
+        {
+            return m_id;
+        }
+
+        [[nodiscard]] std::string_view get_ip() const noexcept
         {
             return m_ip;
         }
@@ -100,7 +118,7 @@ namespace Net
                         update_ip();
                         m_on_notification.broadcast(
                             std::format("Connected sucesfully to {}", get_ip()), Severity::notification);
-                        this->start_waiting_for_messages();
+                        start_waiting_for_messages();
                     }
                 });
         }
@@ -215,19 +233,15 @@ namespace Net
                 });
         }
 
-        void on_message_received(Net_message<Id_type> message) const
+        void on_message_received(Net_message<Id_type> message)
         {
-            Owned_message<Id_type> owned_message = create_owned_message(std::move(message));
+            auto owned_message = Owned_message<Id_type>(std::move(message), Client_information(get_id(), get_ip()));
             m_on_message.broadcast(std::move(owned_message));
-        }
-
-        [[nodiscard]] virtual Owned_message<Id_type> create_owned_message(Net_message<Id_type> message) const
-        {
-            return Owned_message<Id_type>(std::move(message), nullptr);
         }
 
         Protocol::socket m_socket;
         std::string m_ip = "0.0.0.0";
+        const uint32_t m_id = 0;
         bool m_is_waiting_for_messages = false;
 
         Net_message<Id_type> m_temp_message;
