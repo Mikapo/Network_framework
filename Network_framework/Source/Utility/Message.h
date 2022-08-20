@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Utility/Net_common.h"
+#include "../Utility/Common.h"
 #include <ostream>
 #include <span>
 #include <stdexcept>
@@ -10,9 +10,6 @@
 
 namespace Net
 {
-    template <Id_concept Id_type>
-    class Connection;
-
     using Header_size_type = uint64_t;
 
     template <Id_concept Id_type>
@@ -36,7 +33,7 @@ namespace Net
     };
 
     template <typename T>
-    concept Net_message_data_concept = std::is_standard_layout_v<T>;
+    concept Message_data_concept = std::is_standard_layout_v<T>;
 
     template <Id_concept Id_type>
     class Message
@@ -52,8 +49,8 @@ namespace Net
             return stream;
         }
 
-        template <Net_message_data_concept Data_type>
-        Message& push_back(const Data_type& data)
+        template <Message_data_concept Data_type>
+        void push_back(const Data_type& data)
         {
             const size_t size = m_body.size();
             const size_t new_size = size + sizeof(Data_type);
@@ -67,23 +64,10 @@ namespace Net
             std::memcpy(&body_span[size], &data, sizeof(Data_type));
 
             m_header.m_size = static_cast<Header_size_type>(m_body.size());
-            return *this;
         }
 
-        template <typename Iterator_type>
-        Message& push_back_from_container(Iterator_type begin, Iterator_type end)
-        {
-            const size_t size = end - begin;
-            m_body.reserve(size);
-
-            for (; begin != end; ++begin)
-                push_back(*begin);
-
-            return *this;
-        }
-
-        template <Net_message_data_concept Data_type>
-        Message& extract(Data_type& data)
+        template <Message_data_concept Data_type>
+        Data_type extract()
         {
             if (sizeof(Data_type) > m_body.size())
                 throw std::length_error("not enough data to extract");
@@ -91,68 +75,41 @@ namespace Net
             const size_t new_size = m_body.size() - sizeof(Data_type);
 
             const std::span body_span = {m_body.data(), m_body.size()};
+            Data_type data;
             std::memcpy(&data, &body_span[new_size], sizeof(Data_type));
 
             resize_body(new_size);
             m_header.m_size = static_cast<Header_size_type>(m_body.size());
-            return *this;
+
+            return data;
         }
 
-        template <typename Iterator_type>
-        void extract_to_container(
-            Iterator_type begin, Iterator_type end, size_t max_amount = std::numeric_limits<size_t>::max())
-        {
-            using Type = std::remove_reference_t<decltype(*begin)>;
-            constexpr size_t type_size = sizeof(Type);
-
-            for (size_t amount = 0; begin != end; ++begin, ++amount)
-            {
-                if (m_body.size() < type_size || amount > max_amount)
-                    break;
-
-                Type value;
-                extract(value);
-
-                *begin = std::move(value);
-            }
-        }
-
-        // pushes size of string as last value in uint64_t format
         void push_back_string(std::string_view string)
         {
             push_back_from_container(string.begin(), string.end());
             push_back(static_cast<Size_type>(string.size()));
         }
 
-        // excepts first value to be uint64_t of size of string
         std::string extract_as_string()
         {
-            Size_type string_size;
-            extract(string_size);
-
-            if (string_size > m_body.size())
-            {
-                push_back(string_size);
-                throw std::logic_error("Invalid string size");
-            }
-
             std::string output;
-            output.resize(string_size);
+            output.resize(extract<Size_type>());
             extract_to_container(output.rbegin(), output.rend());
-
             return output;
         }
 
-        template <Net_message_data_concept Data_type>
+        template <Message_data_concept Data_type>
         friend Message& operator<<(Message& message, const Data_type& data)
         {
-            return message.push_back(data);
+            message.push_back(data);
+            return message;
         }
 
-        template <Net_message_data_concept Data_type>
+        template <Message_data_concept Data_type>
         friend Message& operator>>(Message& message, Data_type& data)
         {
-            return message.extract(data);
+            data = message.extract();
+            return message;
         }
 
         [[nodiscard]] bool operator==(const Message& other) const noexcept
@@ -175,6 +132,12 @@ namespace Net
             m_header.m_id = new_id;
         }
 
+        void clear() noexcept
+        {
+            m_body.clear();
+            m_header.m_size = 0;
+        }
+
         [[nodiscard]] bool is_empty() const noexcept
         {
             return m_body.empty();
@@ -186,6 +149,22 @@ namespace Net
         }
 
     private:
+        template <typename Iterator_type>
+        void push_back_from_container(Iterator_type begin, Iterator_type end)
+        {
+            for (; begin != end; ++begin)
+                push_back(*begin);
+        }
+
+        template <typename Iterator_type>
+        void extract_to_container(Iterator_type begin, Iterator_type end)
+        {
+            using Type = std::iterator_traits<Iterator_type>::value_type;
+
+            for (; begin != end; ++begin)
+                *begin = extract<Type>();
+        }
+
         void resize_body(size_t new_size)
         {
             m_body.resize(new_size);

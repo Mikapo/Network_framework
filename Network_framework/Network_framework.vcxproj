@@ -142,6 +142,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Source\Utility\Client_information.h" />
+    <ClInclude Include="Source\Utility\Common.h" />
     <ClInclude Include="Source\Utility\Delegate.h" />
     <ClInclude Include="Networking\Connection\Client_connection.h" />
     <ClInclude Include="Networking\Connection\Server_connection.h" />

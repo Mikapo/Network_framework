@@ -2,7 +2,7 @@
 
 #include "../Connection/Connection.h"
 #include "../Utility/Delegate.h"
-#include "../Utility/Net_common.h"
+#include "../Utility/Common.h"
 #include "../Utility/Message.h"
 #include "../Utility/Thread_safe_deque.h"
 #include <chrono>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Utility/Delegate.h"
-#include "../Utility/Net_common.h"
+#include "../Utility/Common.h"
 #include "../Utility/Owned_message.h"
 #include "../Utility/Thread_safe_deque.h"
 #include <unordered_map>
