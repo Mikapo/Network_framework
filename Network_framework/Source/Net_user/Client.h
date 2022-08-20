@@ -31,7 +31,7 @@ namespace Net
             {
                 Protocol::resolver resolver = this->create_resolver();
                 auto endpoints = resolver.resolve(host, port);
-                m_connection = this->create_connection(this->create_socket(), 0, endpoints);
+                m_connection = this->create_connection(this->create_socket(), 0, std::ref(endpoints));
                 this->start_asio_thread();
             }
             catch (const std::exception& exception)

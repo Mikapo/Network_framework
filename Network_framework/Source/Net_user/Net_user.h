@@ -110,14 +110,12 @@ namespace Net
             }
         }
 
-        using Optional_end_points = Net_connection<Id_type>::Optional_end_points;
-
+        template <typename... Argtypes>
         [[nodiscard]] std::unique_ptr<Net_connection<Id_type>> create_connection(
-            Protocol::socket socket, uint32_t connection_id,
-            const Optional_end_points& end_points = Optional_end_points())
+            Argtypes... Connection_constructor_arguments)
         {
             std::unique_ptr new_connection =
-                std::make_unique<Net_connection<Id_type>>(std::move(socket), connection_id, end_points);
+                std::make_unique<Net_connection<Id_type>>(std::forward<Argtypes>(Connection_constructor_arguments)...);
 
             new_connection->m_on_message.set_function(
                 [this](Owned_message<Id_type> message) { on_message_received(std::move(message)); });

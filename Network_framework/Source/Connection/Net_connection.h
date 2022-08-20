@@ -21,24 +21,25 @@ namespace Net
     class Net_connection
     {
     public:
-        using Optional_end_points = std::optional<Protocol::resolver::results_type>;
+        using End_points = Protocol::resolver::results_type;
 
-        explicit Net_connection(
-            Protocol::socket socket, uint32_t connection_id,
-            const Optional_end_points& end_points = Optional_end_points())
+        Net_connection(Protocol::socket socket, uint32_t connection_id)
             : m_socket(std::move(socket)), m_id(connection_id)
         {
-            if (end_points.has_value())
-                async_connect(end_points.value());
-
-            else if (is_connected())
+            if (is_connected())
             {
                 start_waiting_for_messages();
                 update_ip();
             }
         }
 
-        virtual ~Net_connection() = default;
+        Net_connection(Protocol::socket socket, uint32_t connection_id, End_points end_points)
+            : m_socket(std::move(socket)), m_id(connection_id)
+        {
+            async_connect(end_points);
+        }
+
+        ~Net_connection() = default;
         Net_connection(const Net_connection&) = delete;
         Net_connection(Net_connection&&) = delete;
         Net_connection& operator=(const Net_connection&) = delete;
@@ -108,9 +109,6 @@ namespace Net
 
         void async_connect(const Protocol::resolver::results_type& endpoints)
         {
-            if (is_connected())
-                throw std::runtime_error("Socket is already connected");
-
             asio::async_connect(
                 m_socket, endpoints, [this](asio::error_code error, const Protocol::endpoint& endpoint) {
                     if (!error)
