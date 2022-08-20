@@ -35,6 +35,9 @@ void send_thread()
         std::string message;
         std::getline(std::cin, message);
 
+        if (message.empty())
+            continue;
+
         Net::Net_message<Message_id> net_message;
         net_message.set_id(Message_id::message);
         net_message.push_back_string(message);

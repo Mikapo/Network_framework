@@ -18,8 +18,13 @@ namespace Net
     {
     public:
         using Seconds = std::chrono::seconds;
+        using Accepted_messages_container = std::unordered_map<Id_type, Message_limits>;
 
-        Net_user() = default;
+        Net_user()
+        {
+            m_accepted_messages = std::make_shared<Accepted_messages_container>();
+        }
+
         virtual ~Net_user() = default;
 
         Net_user(const Net_user&) = delete;
@@ -30,8 +35,7 @@ namespace Net
         void add_accepted_message(Id_type type, uint32_t min = 0, uint32_t max = std::numeric_limits<uint32_t>::max())
         {
             const Message_limits limits = {.m_min = min, .m_max = max};
-            m_accepted_messages[type] = limits;
-            on_new_accepted_message(type, limits);
+            m_accepted_messages->emplace(type, limits);
         }
 
         virtual void update(
@@ -123,7 +127,7 @@ namespace Net
             new_connection->m_on_notification.set_function(
                 [this](const std::string& message, Severity severity) { notifications_push_back(message, severity); });
 
-            new_connection->set_accepted_messages(get_current_accepted_messages());
+            new_connection->set_accepted_messages(m_accepted_messages);
 
             return new_connection;
         }
@@ -226,7 +230,6 @@ namespace Net
             }
         }
 
-        virtual void on_new_accepted_message(Id_type type, Message_limits limits) = 0;
         virtual void check_connections(){};
 
         asio::io_context m_asio_context;
@@ -238,7 +241,7 @@ namespace Net
         std::mutex m_wait_mutex;
         std::chrono::steady_clock::time_point m_last_connection_check;
 
-        std::unordered_map<Id_type, Message_limits> m_accepted_messages;
+        std::shared_ptr<Accepted_messages_container> m_accepted_messages;
         Thread_safe_deque<Owned_message<Id_type>> m_in_queue;
         Thread_safe_deque<Notification> m_notifications;
     };

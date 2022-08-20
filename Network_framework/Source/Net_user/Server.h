@@ -205,12 +205,6 @@ namespace Net
             return next_it;
         }
 
-        void on_new_accepted_message(Id_type type, Message_limits limits) override
-        {
-            for (auto& client : m_connections)
-                client.second->add_accepted_message(type, limits);
-        }
-
         void check_connections() override
         {
             auto connections_iterator = m_connections.begin();

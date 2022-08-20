@@ -89,12 +89,6 @@ namespace Net
             }
         }
 
-        void on_new_accepted_message(Id_type type, Message_limits limits) override
-        {
-            if (m_connection)
-                m_connection->add_accepted_message(type, limits);
-        }
-
         std::unique_ptr<Net_connection<Id_type>> m_connection;
     };
 } // namespace Net
