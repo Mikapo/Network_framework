@@ -1,4 +1,4 @@
-#include "Net_user/Server.h"
+#include "User/Server.h"
 #include <format>
 #include <iostream>
 #include <string>
@@ -21,34 +21,34 @@ void server_notification(std::string_view notification, Net::Severity severity)
     std::cout << notification << "\n";
 }
 
-void on_set_name(uint32_t client_id, Net::Net_message<Message_id> message)
+void on_set_name(uint32_t client_id, Net::Message<Message_id> message)
 {
     const std::string name = message.extract_as_string();
     names[client_id] = name;
 
     const std::string respond = "Name accepted";
-    Net::Net_message<Message_id> net_message;
+    Net::Message<Message_id> net_message;
     net_message.set_id(Message_id::server_message);
     net_message.push_back_string(respond);
 
     server.send_message_to_client(client_id, net_message);
 }
 
-void on_chat_message(uint32_t client_id, Net::Net_message<Message_id> message)
+void on_chat_message(uint32_t client_id, Net::Message<Message_id> message)
 {
     const auto found_name = names.find(client_id);
 
     const std::string chat_message = message.extract_as_string();
     const std::string formated_message = std::format("[{}] {}", found_name->second, chat_message);
 
-    Net::Net_message<Message_id> net_message;
+    Net::Message<Message_id> net_message;
     net_message.set_id(Message_id::server_message);
     net_message.push_back_string(formated_message);
 
     server.send_message_to_all_clients(net_message);
 }
 
-void server_on_message(Net::Client_information client, Net::Net_message<Message_id> message)
+void server_on_message(Net::Client_information client, Net::Message<Message_id> message)
 {
     switch (message.get_id())
     {

@@ -14,13 +14,13 @@ namespace Net
     };
 
     template <Id_concept Id_type>
-    class Net_connection
+    class Connection
     {
     public:
         using Accepted_messages_ptr = std::shared_ptr<const std::unordered_map<Id_type, Message_limits>>;
         using End_points = Protocol::resolver::results_type;
 
-        Net_connection(Protocol::socket socket, uint32_t connection_id)
+        Connection(Protocol::socket socket, uint32_t connection_id)
             : m_socket(std::move(socket)), m_id(connection_id)
         {
             if (is_connected())
@@ -30,17 +30,17 @@ namespace Net
             }
         }
 
-        Net_connection(Protocol::socket socket, uint32_t connection_id, const End_points& end_points)
+        Connection(Protocol::socket socket, uint32_t connection_id, const End_points& end_points)
             : m_socket(std::move(socket)), m_id(connection_id)
         {
             async_connect(end_points);
         }
 
-        ~Net_connection() = default;
-        Net_connection(const Net_connection&) = delete;
-        Net_connection(Net_connection&&) = delete;
-        Net_connection& operator=(const Net_connection&) = delete;
-        Net_connection& operator=(Net_connection&&) = delete;
+        ~Connection() = default;
+        Connection(const Connection&) = delete;
+        Connection(Connection&&) = delete;
+        Connection& operator=(const Connection&) = delete;
+        Connection& operator=(Connection&&) = delete;
 
         void disconnect(const std::string& reason = "", bool is_error = false)
         {
@@ -69,7 +69,7 @@ namespace Net
             return m_ip;
         }
 
-        void send_message(const Net_message<Id_type>& message)
+        void send_message(const Message<Id_type>& message)
         {
             const bool is_writing_message = !m_out_queue.empty();
 
@@ -216,15 +216,15 @@ namespace Net
         {
             auto owned_message = Owned_message<Id_type>(std::move(m_received_message), Client_information(get_id(), get_ip()));
             m_on_message.broadcast(std::move(owned_message));
-            m_received_message = Net_message<Id_type>();
+            m_received_message = Message<Id_type>();
         }
 
         const uint32_t m_id = 0;
         std::string m_ip = "0.0.0.0";
         Protocol::socket m_socket;
 
-        Net_message<Id_type> m_received_message;
-        Thread_safe_deque<Net_message<Id_type>> m_out_queue;
+        Message<Id_type> m_received_message;
+        Thread_safe_deque<Message<Id_type>> m_out_queue;
         Accepted_messages_ptr m_accepted_messages = nullptr;
     };
 } // namespace Net

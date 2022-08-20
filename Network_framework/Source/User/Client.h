@@ -1,14 +1,14 @@
 #pragma once
 
 #include "../Utility/Thread_safe_deque.h"
-#include "Net_user.h"
+#include "User.h"
 #include <cstdint>
 #include <memory>
 
 namespace Net
 {
     template <Id_concept Id_type>
-    class Client : public Net_user<Id_type>
+    class Client : public User<Id_type>
     {
     public:
         Client() noexcept
@@ -66,18 +66,18 @@ namespace Net
             std::optional<std::chrono::seconds> check_connections_interval =
                 std::optional<std::chrono::seconds>()) override
         {
-            Net_user<Id_type>::update(max_messages, wait, check_connections_interval);
+            User<Id_type>::update(max_messages, wait, check_connections_interval);
 
             handle_received_messages(max_messages);
         }
 
-        void send_message(const Net_message<Id_type>& message)
+        void send_message(const Message<Id_type>& message)
         {
             if (is_connected())
                 this->async_send_message_to_connection(m_connection.get(), message);
         }
 
-        Delegate<Net_message<Id_type>> m_on_message;
+        Delegate<Message<Id_type>> m_on_message;
 
     private:
         void handle_received_messages(size_t max_messages)
@@ -89,6 +89,6 @@ namespace Net
             }
         }
 
-        std::unique_ptr<Net_connection<Id_type>> m_connection;
+        std::unique_ptr<Connection<Id_type>> m_connection;
     };
 } // namespace Net

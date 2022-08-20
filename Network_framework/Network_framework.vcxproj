@@ -156,12 +156,12 @@
     <ClInclude Include="Networking\Net_user\Net_user.h" />
     <ClInclude Include="Networking\Net_user\Server.h" />
     <ClInclude Include="Networking\Utility\Thread_safe_deque.h" />
-    <ClInclude Include="Source\Connection\Net_connection.h" />
-    <ClInclude Include="Source\Net_user\Client.h" />
-    <ClInclude Include="Source\Net_user\Net_user.h" />
-    <ClInclude Include="Source\Net_user\Server.h" />
+    <ClInclude Include="Source\Connection\Connection.h" />
+    <ClInclude Include="Source\User\Client.h" />
+    <ClInclude Include="Source\User\User.h" />
+    <ClInclude Include="Source\User\Server.h" />
     <ClInclude Include="Source\Utility\Net_common.h" />
-    <ClInclude Include="Source\Utility\Net_message.h" />
+    <ClInclude Include="Source\Utility\Message.h" />
     <ClInclude Include="Source\Utility\Owned_message.h" />
     <ClInclude Include="Source\Utility\Thread_safe_deque.h" />
   </ItemGroup>

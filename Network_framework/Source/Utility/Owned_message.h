@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Client_information.h"
-#include "Net_message.h"
+#include "Message.h"
 
 namespace Net
 {
@@ -9,7 +9,7 @@ namespace Net
     struct Owned_message
     {
 
-        Owned_message(Net_message<Id_type> message, Client_information client_information)
+        Owned_message(Message<Id_type> message, Client_information client_information)
             : m_message(std::move(message)), m_client_information(std::move(client_information))
         {
         }
@@ -29,7 +29,7 @@ namespace Net
             return !(*this == other);
         }
 
-        Net_message<Id_type> m_message;
+        Message<Id_type> m_message;
         const Client_information m_client_information;
     };
 } // namespace Net

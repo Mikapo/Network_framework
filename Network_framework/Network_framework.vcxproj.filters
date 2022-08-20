@@ -54,22 +54,22 @@
     <ClInclude Include="Networking\Interfaces\Client_connection_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Connection\Net_connection.h">
+    <ClInclude Include="Source\Connection\Connection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Net_user\Client.h">
+    <ClInclude Include="Source\User\Client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Net_user\Net_user.h">
+    <ClInclude Include="Source\User\User.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Net_user\Server.h">
+    <ClInclude Include="Source\User\Server.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Utility\Net_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Utility\Net_message.h">
+    <ClInclude Include="Source\Utility\Message.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Utility\Thread_safe_deque.h">

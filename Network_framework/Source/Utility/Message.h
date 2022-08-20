@@ -11,10 +11,7 @@
 namespace Net
 {
     template <Id_concept Id_type>
-    class Client_connection;
-
-    template <Id_concept Id_type>
-    class Net_connection;
+    class Connection;
 
     using Header_size_type = uint64_t;
 
@@ -42,13 +39,13 @@ namespace Net
     concept Net_message_data_concept = std::is_standard_layout_v<T>;
 
     template <Id_concept Id_type>
-    class Net_message
+    class Message
     {
     public:
         using Size_type = uint64_t;
-        friend Net_connection<Id_type>;
+        friend Connection<Id_type>;
 
-        friend std::ostream& operator<<(std::ostream& stream, const Net_message& message)
+        friend std::ostream& operator<<(std::ostream& stream, const Message& message)
         {
             stream << "ID: " << static_cast<std::underlying_type_t<Id_type>>(message.m_header.m_id)
                    << " Size: " << message.m_header.m_size;
@@ -56,7 +53,7 @@ namespace Net
         }
 
         template <Net_message_data_concept Data_type>
-        Net_message& push_back(const Data_type& data)
+        Message& push_back(const Data_type& data)
         {
             const size_t size = m_body.size();
             const size_t new_size = size + sizeof(Data_type);
@@ -74,7 +71,7 @@ namespace Net
         }
 
         template <typename Iterator_type>
-        Net_message& push_back_from_container(Iterator_type begin, Iterator_type end)
+        Message& push_back_from_container(Iterator_type begin, Iterator_type end)
         {
             const size_t size = end - begin;
             m_body.reserve(size);
@@ -86,7 +83,7 @@ namespace Net
         }
 
         template <Net_message_data_concept Data_type>
-        Net_message& extract(Data_type& data)
+        Message& extract(Data_type& data)
         {
             if (sizeof(Data_type) > m_body.size())
                 throw std::length_error("not enough data to extract");
@@ -147,23 +144,23 @@ namespace Net
         }
 
         template <Net_message_data_concept Data_type>
-        friend Net_message& operator<<(Net_message& message, const Data_type& data)
+        friend Message& operator<<(Message& message, const Data_type& data)
         {
             return message.push_back(data);
         }
 
         template <Net_message_data_concept Data_type>
-        friend Net_message& operator>>(Net_message& message, Data_type& data)
+        friend Message& operator>>(Message& message, Data_type& data)
         {
             return message.extract(data);
         }
 
-        [[nodiscard]] bool operator==(const Net_message& other) const noexcept
+        [[nodiscard]] bool operator==(const Message& other) const noexcept
         {
             return m_header == other.m_header && m_body == other.m_body;
         }
 
-        [[nodiscard]] bool operator!=(const Net_message& other) const noexcept
+        [[nodiscard]] bool operator!=(const Message& other) const noexcept
         {
             return !(*this == other);
         }

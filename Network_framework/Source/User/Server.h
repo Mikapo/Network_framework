@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Utility/Owned_message.h"
-#include "Net_user.h"
+#include "User.h"
 #include <cstdint>
 #include <format>
 #include <limits>
@@ -12,9 +12,11 @@
 namespace Net
 {
     template <Id_concept Id_type>
-    class Server : public Net_user<Id_type>
+    class Server : public User<Id_type>
     {
     public:
+        using Connection_container = std::unordered_map<uint32_t, std::unique_ptr<Connection<Id_type>>>;
+
         explicit Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
         {
         }
@@ -55,7 +57,7 @@ namespace Net
         void update(size_t max_handled_items, bool wait, std::optional<std::chrono::seconds> check_connections_interval)
             override
         {
-            Net_user<Id_type>::update(max_handled_items, wait, check_connections_interval);
+            User<Id_type>::update(max_handled_items, wait, check_connections_interval);
 
             handle_received_messages(max_handled_items);
             handle_new_connections(max_handled_items);
@@ -79,7 +81,7 @@ namespace Net
                 remove_connection(found_client);
         }
 
-        void send_message_to_client(uint32_t client_id, const Net_message<Id_type>& message)
+        void send_message_to_client(uint32_t client_id, const Message<Id_type>& message)
         {
             auto found_client = m_connections.find(client_id);
             if (found_client == m_connections.end())
@@ -93,7 +95,7 @@ namespace Net
                 remove_connection(found_client);
         }
 
-        void send_message_to_all_clients(const Net_message<Id_type>& message, uint32_t ignored_client = 0)
+        void send_message_to_all_clients(const Message<Id_type>& message, uint32_t ignored_client = 0)
         {
             auto connections_iterator = m_connections.begin();
             while (connections_iterator != m_connections.end())
@@ -114,12 +116,12 @@ namespace Net
 
         Delegate<const Client_information&, bool&> m_on_client_connect;
         Delegate<const Client_information&> m_on_client_disconnect;
-        Delegate<const Client_information&, Net_message<Id_type>> m_on_message;
+        Delegate<const Client_information&, Message<Id_type>> m_on_message;
 
     protected:
         bool should_stop_wait() noexcept override
         {
-            bool parent_conditions = Net_user<Id_type>::should_stop_wait();
+            bool parent_conditions = User<Id_type>::should_stop_wait();
 
             return parent_conditions || !m_new_connections.empty();
         }
@@ -219,7 +221,7 @@ namespace Net
             }
         }
 
-        std::unordered_map<uint32_t, std::unique_ptr<Net_connection<Id_type>>> m_connections;
+        Connection_container m_connections;
         Thread_safe_deque<Protocol::socket> m_new_connections;
 
         Protocol::acceptor m_acceptor;

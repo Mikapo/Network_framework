@@ -1,4 +1,4 @@
-#include "Net_user/Client.h"
+#include "User/Client.h"
 #include <iostream>
 #include <string>
 
@@ -10,10 +10,10 @@ enum class Message_id : uint8_t
 };
 
 bool send_thread_exit_flag = false;
-Net::Thread_safe_deque<Net::Net_message<Message_id>> messages;
+Net::Thread_safe_deque<Net::Message<Message_id>> messages;
 Net::Client<Message_id> client;
 
-void client_on_message(Net::Net_message<Message_id> message)
+void client_on_message(Net::Message<Message_id> message)
 {
     switch (message.get_id())
     {
@@ -38,7 +38,7 @@ void send_thread()
         if (message.empty())
             continue;
 
-        Net::Net_message<Message_id> net_message;
+        Net::Message<Message_id> net_message;
         net_message.set_id(Message_id::message);
         net_message.push_back_string(message);
 
@@ -52,7 +52,7 @@ void send_name()
     std::string username;
     std::getline(std::cin, username);
 
-    Net::Net_message<Message_id> message;
+    Net::Message<Message_id> message;
     message.set_id(Message_id::set_name);
     message.push_back_string(username);
 

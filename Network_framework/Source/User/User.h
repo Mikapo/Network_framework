@@ -1,36 +1,35 @@
 #pragma once
 
-#include "../Connection/Net_connection.h"
+#include "../Connection/Connection.h"
 #include "../Utility/Delegate.h"
 #include "../Utility/Net_common.h"
-#include "../Utility/Net_message.h"
+#include "../Utility/Message.h"
 #include "../Utility/Thread_safe_deque.h"
 #include <chrono>
 #include <concepts>
-#include <functional>
 #include <optional>
 #include <thread>
 
 namespace Net
 {
     template <Id_concept Id_type>
-    class Net_user
+    class User
     {
     public:
         using Seconds = std::chrono::seconds;
         using Accepted_messages_container = std::unordered_map<Id_type, Message_limits>;
 
-        Net_user()
+        User()
         {
             m_accepted_messages = std::make_shared<Accepted_messages_container>();
         }
 
-        virtual ~Net_user() = default;
+        virtual ~User() = default;
 
-        Net_user(const Net_user&) = delete;
-        Net_user(Net_user&&) = delete;
-        Net_user& operator=(const Net_user&) = delete;
-        Net_user& operator=(Net_user&&) = delete;
+        User(const User&) = delete;
+        User(User&&) = delete;
+        User& operator=(const User&) = delete;
+        User& operator=(User&&) = delete;
 
         void add_accepted_message(Id_type type, uint32_t min = 0, uint32_t max = std::numeric_limits<uint32_t>::max())
         {
@@ -115,11 +114,11 @@ namespace Net
         }
 
         template <typename... Argtypes>
-        [[nodiscard]] std::unique_ptr<Net_connection<Id_type>> create_connection(
+        [[nodiscard]] std::unique_ptr<Connection<Id_type>> create_connection(
             Argtypes... Connection_constructor_arguments)
         {
             std::unique_ptr new_connection =
-                std::make_unique<Net_connection<Id_type>>(std::forward<Argtypes>(Connection_constructor_arguments)...);
+                std::make_unique<Connection<Id_type>>(std::forward<Argtypes>(Connection_constructor_arguments)...);
 
             new_connection->m_on_message.set_function(
                 [this](Owned_message<Id_type> message) { on_message_received(std::move(message)); });
@@ -155,7 +154,7 @@ namespace Net
             return has_messages || has_notifications;
         }
 
-        void async_send_message_to_connection(Net_connection<Id_type>* connection, const Net_message<Id_type>& message)
+        void async_send_message_to_connection(Connection<Id_type>* connection, const Message<Id_type>& message)
         {
             give_job_to_asio([connection, message] { connection->send_message(message); });
         }
