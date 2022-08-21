@@ -65,7 +65,12 @@ namespace Net
             return stream;
         }
 
-        // Push data to end of the message
+        /** 
+        *   Push data to the end of the message
+        * 
+        *   @param data to be pushed
+        *   @throws if the size of data is larger than the max value that the Header_size_type can hold
+        */
         template <Message_data_concept Data_type>
         void push_back(const Data_type& data)
         {
@@ -76,12 +81,19 @@ namespace Net
                 throw std::length_error("storing too much data to message");
 
             resize_body(new_size);
+
+            // Copying the data to the end of the body 
             std::memcpy(&m_body.at(size), &data, sizeof(Data_type));
 
             m_header.m_size = checked_cast<Header_size_type>(m_body.size());
         }
 
-        // Extract data from the end of the message
+        /**
+        *   Extract data from the end of the message
+        *   
+        *   @return the data that was extracted
+        *   @throws if there is not enough data to be extracted
+        */
         template <Message_data_concept Data_type>
         Data_type extract()
         {
@@ -90,6 +102,7 @@ namespace Net
 
             const size_t new_size = m_body.size() - sizeof(Data_type);
 
+            // Copyign to the data from the end of the body
             Data_type data;
             std::memcpy(&data, &m_body.at(new_size), sizeof(Data_type));
 
@@ -164,6 +177,11 @@ namespace Net
         }
 
     private:
+        /**
+         *  @param begin iterator
+         *  @param end iterator
+         *  @throws if tries to push back too much data
+         */
         template <typename Iterator_type>
         void push_back_from_container(Iterator_type begin, Iterator_type end)
         {
@@ -171,6 +189,11 @@ namespace Net
                 push_back(*begin);
         }
 
+        /**
+        *   @param begin iterator
+        *   @param end iterator
+        *   @throws if tries to extract too much data
+        */
         template <typename Iterator_type>
         void extract_to_container(Iterator_type begin, Iterator_type end)
         {
