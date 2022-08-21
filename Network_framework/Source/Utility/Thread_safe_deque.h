@@ -9,7 +9,7 @@ namespace Net
     class Thread_safe_deque
     {
     public:
-        Thread_safe_deque() = default;
+        Thread_safe_deque() noexcept = default;
         Thread_safe_deque(const Thread_safe_deque&) = delete;
         Thread_safe_deque(Thread_safe_deque&&) = delete;
         ~Thread_safe_deque()

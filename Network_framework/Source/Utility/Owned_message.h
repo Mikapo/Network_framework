@@ -5,15 +5,17 @@
 
 namespace Net
 {
+    // Message + information about the sender of the message
     template <Id_concept Id_type>
     struct Owned_message
     {
 
-        Owned_message(Message<Id_type> message, Client_information client_information)
+        Owned_message(Message<Id_type> message, Client_information client_information) noexcept
             : m_message(std::move(message)), m_client_information(std::move(client_information))
         {
         }
 
+        // Print operator
         friend std::ostream& operator<<(std::ostream& stream, const Owned_message& message)
         {
             return stream << message.m_message;

@@ -11,6 +11,8 @@ namespace Net
     class Client : public User<Id_type>
     {
     public:
+        using Optional_seconds = std::optional<std::chrono::seconds>;
+
         Client() noexcept
         {
         }
@@ -29,9 +31,16 @@ namespace Net
         {
             try
             {
+                /**
+                 *   Using resolver allows more than just the ip being passed to this function.
+                 *   For eexamble you can pass webpage addresses for conneting.
+                 */
                 Protocol::resolver resolver = this->create_resolver();
                 auto endpoints = resolver.resolve(host, port);
+
+                // Creates the connection and passes the endpoints to it for connecting
                 m_connection = this->create_connection(this->create_socket(), 0, std::ref(endpoints));
+
                 this->start_asio_thread();
             }
             catch (const std::exception& exception)
@@ -61,25 +70,33 @@ namespace Net
             return false;
         }
 
+         /**
+         *   Handle everything received through internet
+         *
+         *   @param The max items handled
+         *   @param Should the function wait if there is no items to handle
+         *   @param Optional interval for checking connections. If you don't give this there will be no checking
+         */
         void update(
-            size_t max_messages = std::numeric_limits<size_t>::max(), bool wait = false,
-            std::optional<std::chrono::seconds> check_connections_interval =
-                std::optional<std::chrono::seconds>()) override
+            size_t max_items = SIZE_T_MAX, bool wait = false,
+            Optional_seconds check_connections_interval = Optional_seconds()) override
         {
-            User<Id_type>::update(max_messages, wait, check_connections_interval);
+            User<Id_type>::update(max_items, wait, check_connections_interval);
 
-            handle_received_messages(max_messages);
+            handle_received_messages(max_items);
         }
 
-        void send_message(const Message<Id_type>& message)
+        // Sends the message to the server or does nothing if not connected
+        void send_message(Message<Id_type> message)
         {
             if (is_connected())
-                this->async_send_message_to_connection(m_connection.get(), message);
+                this->async_send_message_to_connection(m_connection.get(), std::move(message));
         }
 
         Delegate<Message<Id_type>> m_on_message;
 
     private:
+        // Triggers the on message callback for all the received messages
         void handle_received_messages(size_t max_messages)
         {
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)

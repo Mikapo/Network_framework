@@ -16,6 +16,7 @@ namespace Net
     {
     public:
         using Connection_container = std::unordered_map<uint32_t, std::unique_ptr<Connection<Id_type>>>;
+        using Optional_seconds = std::optional<std::chrono::seconds>;
 
         explicit Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
         {
@@ -54,7 +55,16 @@ namespace Net
             this->notifications_push_back("Server has been stopped");
         }
 
-        void update(size_t max_handled_items, bool wait, std::optional<std::chrono::seconds> check_connections_interval)
+         /**
+         *   Handle everything received through internet
+         *
+         *   @param The max items handled
+         *   @param Should the function wait if there is no items to handle
+         *   @param Optional interval for checking connections. If you don't give this there will be no checking
+         */
+        void update(
+            size_t max_handled_items = SIZE_T_MAX, bool wait = false,
+            Optional_seconds check_connections_interval = Optional_seconds())
             override
         {
             User<Id_type>::update(max_handled_items, wait, check_connections_interval);
@@ -81,7 +91,7 @@ namespace Net
                 remove_connection(found_client);
         }
 
-        void send_message_to_client(uint32_t client_id, const Message<Id_type>& message)
+        void send_message_to_client(uint32_t client_id, Message<Id_type> message)
         {
             auto found_client = m_connections.find(client_id);
             if (found_client == m_connections.end())
@@ -90,7 +100,7 @@ namespace Net
             auto& client_ptr = found_client->second;
 
             if (client_ptr->is_connected())
-                this->async_send_message_to_connection(client_ptr.get(), message);
+                this->async_send_message_to_connection(client_ptr.get(), std::move(message));
             else
                 remove_connection(found_client);
         }
@@ -119,14 +129,15 @@ namespace Net
         Delegate<const Client_information&, Message<Id_type>> m_on_message;
 
     protected:
-        bool should_stop_wait() noexcept override
+        bool should_stop_waiting() override
         {
-            bool parent_conditions = User<Id_type>::should_stop_wait();
+            const bool parent_conditions = User<Id_type>::should_stop_waiting();
 
             return parent_conditions || !m_new_connections.empty();
         }
 
     private:
+        // Triggers the on message callback for the every message
         void handle_received_messages(size_t max_messages)
         {
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
@@ -137,12 +148,18 @@ namespace Net
             }
         }
 
+        /**
+        * Handles the new non accepted connections
+        * 
+        * @param max amount of the new connections handled
+        */
         void handle_new_connections(size_t max_amount)
         {
             for (size_t i = 0; i < max_amount && !m_new_connections.empty(); ++i)
                 add_connection(m_new_connections.pop_front());
         }
 
+        // Adds the new socket as connection 
         void add_connection(Protocol::socket socket)
         {
             if (!socket.is_open())
@@ -166,6 +183,7 @@ namespace Net
                 this->notifications_push_back(std::format("Connection {} denied", ip));
         }
 
+        // Primes the Asio thread to wait for the connections in async way
         void async_wait_for_connections()
         {
             m_acceptor.async_accept([this](asio::error_code error, Protocol::socket socket) {
@@ -190,6 +208,12 @@ namespace Net
             });
         }
 
+        /** 
+        *   Removes the connection from m_connections
+        * 
+        *   @param The iterator pointing to the connection in m_connections
+        *   @return The iterator pointing to the next element after removed connection
+        */
         template <typename Connection_it_type>
         auto remove_connection(Connection_it_type connection_it)
         {
@@ -207,6 +231,7 @@ namespace Net
             return next_it;
         }
 
+        // Removes all the unconnected clients
         void check_connections() override
         {
             auto connections_iterator = m_connections.begin();
@@ -225,8 +250,7 @@ namespace Net
         Thread_safe_deque<Protocol::socket> m_new_connections;
 
         Protocol::acceptor m_acceptor;
-        constexpr static uint32_t FIRST_CLIENT_ID = 1000;
-        uint32_t m_id_counter = FIRST_CLIENT_ID;
+        uint32_t m_id_counter = 1000;
 
         std::unordered_set<std::string> m_banned_ip;
     };

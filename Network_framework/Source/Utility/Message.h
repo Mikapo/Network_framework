@@ -10,38 +10,54 @@
 
 namespace Net
 {
+    // Type that is used to indicate how large the message is in the header
     using Header_size_type = uint64_t;
 
+    // The message header is for identifying what type of message has been received    
     template <Id_concept Id_type>
-    struct Net_message_header
+    struct Message_header
     {
         constexpr static uint64_t CONSTANT_VALIDATION_KEY = 9970951313928774000;
 
+        // Key used to validate the message
         uint64_t m_validation_key = CONSTANT_VALIDATION_KEY;
+
+        // Id used to recognize what type of message this is
         Id_type m_id = {};
+
+        // Size of the message
         Header_size_type m_size = 0;
 
-        bool operator==(const Net_message_header& other) const noexcept
+        bool operator==(const Message_header& other) const noexcept
         {
             return m_id == other.m_id && m_size == other.m_size;
         }
 
-        bool operator!=(const Net_message_header& other) const noexcept
+        bool operator!=(const Message_header& other) const noexcept
         {
             return !(*this == other);
         }
     };
 
+    // This concept decides what kind of data the message accepts
     template <typename T>
     concept Message_data_concept = std::is_standard_layout_v<T>;
 
+    template<Id_concept Id_type>
+    class Connection;
+
+    // This class is used to store messages that are sent over internet
     template <Id_concept Id_type>
     class Message
     {
     public:
+        // Type used to store container sizes in the message body
         using Size_type = uint64_t;
+
+        // Marking connection as friend so it has full access to the body and the header
         friend Connection<Id_type>;
 
+        // Print operator
         friend std::ostream& operator<<(std::ostream& stream, const Message& message)
         {
             stream << "ID: " << static_cast<std::underlying_type_t<Id_type>>(message.m_header.m_id)
@@ -49,6 +65,7 @@ namespace Net
             return stream;
         }
 
+        // Push data to end of the message
         template <Message_data_concept Data_type>
         void push_back(const Data_type& data)
         {
@@ -59,13 +76,12 @@ namespace Net
                 throw std::length_error("storing too much data to message");
 
             resize_body(new_size);
+            std::memcpy(&m_body.at(size), &data, sizeof(Data_type));
 
-            const std::span body_span = {m_body.data(), m_body.size()};
-            std::memcpy(&body_span[size], &data, sizeof(Data_type));
-
-            m_header.m_size = static_cast<Header_size_type>(m_body.size());
+            m_header.m_size = checked_cast<Header_size_type>(m_body.size());
         }
 
+        // Extract data from the end of the message
         template <Message_data_concept Data_type>
         Data_type extract()
         {
@@ -74,22 +90,23 @@ namespace Net
 
             const size_t new_size = m_body.size() - sizeof(Data_type);
 
-            const std::span body_span = {m_body.data(), m_body.size()};
             Data_type data;
-            std::memcpy(&data, &body_span[new_size], sizeof(Data_type));
+            std::memcpy(&data, &m_body.at(new_size), sizeof(Data_type));
 
             resize_body(new_size);
-            m_header.m_size = static_cast<Header_size_type>(m_body.size());
+            m_header.m_size = checked_cast<Header_size_type>(m_body.size());
 
             return data;
         }
 
+        // Pushes a string and the size of the string after the string
         void push_back_string(std::string_view string)
         {
             push_back_from_container(string.begin(), string.end());
-            push_back(static_cast<Size_type>(string.size()));
+            push_back(checked_cast<Size_type>(string.size()));
         }
 
+        // Expects the size of the string at top of the message
         std::string extract_as_string()
         {
             std::string output;
@@ -98,6 +115,8 @@ namespace Net
             return output;
         }
 
+
+        // Operator << for pushing data
         template <Message_data_concept Data_type>
         friend Message& operator<<(Message& message, const Data_type& data)
         {
@@ -105,6 +124,7 @@ namespace Net
             return message;
         }
 
+        // Operator >> for extracting data
         template <Message_data_concept Data_type>
         friend Message& operator>>(Message& message, Data_type& data)
         {
@@ -143,11 +163,6 @@ namespace Net
             return m_body.empty();
         }
 
-        [[nodiscard]] size_t size_in_bytes() const noexcept
-        {
-            return sizeof(m_header) + m_body.size();
-        }
-
     private:
         template <typename Iterator_type>
         void push_back_from_container(Iterator_type begin, Iterator_type end)
@@ -170,7 +185,21 @@ namespace Net
             m_body.resize(new_size);
         }
 
-        Net_message_header<Id_type> m_header;
+        // Simple integral cast with check that the value has not changes after cast
+        template <std::integral Cast_to, std::integral Cast_from>
+        static Cast_to checked_cast(const Cast_from& value)
+        {
+            const Cast_to casted_value = static_cast<Cast_to>(value);
+
+            if (value != casted_value)
+                throw std::length_error("Value changed when casted");
+
+            return casted_value;
+        }
+
+        Message_header<Id_type> m_header;
+
+        // The message body in bytes
         std::vector<char> m_body = {};
     };
-}; // namespace Net
+} // namespace Net
