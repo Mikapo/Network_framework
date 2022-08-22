@@ -35,6 +35,7 @@ namespace Net
                  *   Using resolver allows more than just the ip being passed to this function.
                  *   For eexamble you can pass webpage addresses for conneting.
                  */
+                m_has_received_server_data = false;
                 Protocol::resolver resolver = this->create_resolver();
                 auto endpoints = resolver.resolve(host, port);
 
@@ -70,7 +71,7 @@ namespace Net
             return false;
         }
 
-         /**
+        /**
          *   Handle everything received through internet
          *
          *   @param The max items handled
@@ -89,9 +90,12 @@ namespace Net
         // Sends the message to the server or does nothing if not connected
         void send_message(Message<Id_type> message)
         {
-            if (is_connected())
+            if (m_has_received_server_data && is_connected())
                 this->async_send_message_to_connection(m_connection.get(), std::move(message));
         }
+
+        //You can only start sending messages to server after this event
+        Delegate<> m_on_connected;
 
         Delegate<Message<Id_type>> m_on_message;
 
@@ -101,11 +105,40 @@ namespace Net
         {
             for (size_t i = 0; i < max_messages && !this->is_in_queue_empty(); ++i)
             {
-                auto message = this->in_queue_pop_front();
-                m_on_message.broadcast(std::move(message.m_message));
+                auto owned_message = this->in_queue_pop_front();
+
+                if (owned_message.m_message.get_internal_id() == Internal_id::not_internal)
+                    m_on_message.broadcast(std::move(owned_message.m_message));
+                else
+                    handle_internal_message(std::move(owned_message));
+            }
+        }
+
+        void handle_server_data(const Server_data& data)
+        {
+            m_remote_id = data.m_client_id;
+            m_has_received_server_data = true;
+            m_on_connected.broadcast();
+        }
+
+        // Handles the message that is internal to the framework
+        void handle_internal_message(Owned_message<Id_type> owned_message)
+        {
+            Message<Id_type>& message = owned_message.m_message;
+
+            switch (message.get_internal_id())
+            {
+            case Internal_id::server_data:
+                handle_server_data(Message_converter<Id_type>::extract_server_data(message));
+                break;
+            default:
+                break;
             }
         }
 
         std::unique_ptr<Connection<Id_type>> m_connection;
+
+        uint32_t m_remote_id = 0;
+        bool m_has_received_server_data = false;
     };
 } // namespace Net

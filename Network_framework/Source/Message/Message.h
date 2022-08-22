@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Utility/Common.h"
+#include "Message_header.h"
 #include <ostream>
 #include <span>
 #include <stdexcept>
@@ -10,35 +11,6 @@
 
 namespace Net
 {
-    // Type that is used to indicate how large the message is in the header
-    using Header_size_type = uint64_t;
-
-    // The message header is for identifying what type of message has been received    
-    template <Id_concept Id_type>
-    struct Message_header
-    {
-        constexpr static uint64_t CONSTANT_VALIDATION_KEY = 9970951313928774000;
-
-        // Key used to validate the message
-        uint64_t m_validation_key = CONSTANT_VALIDATION_KEY;
-
-        // Id used to recognize what type of message this is
-        Id_type m_id = {};
-
-        // Size of the message
-        Header_size_type m_size = 0;
-
-        bool operator==(const Message_header& other) const noexcept
-        {
-            return m_id == other.m_id && m_size == other.m_size;
-        }
-
-        bool operator!=(const Message_header& other) const noexcept
-        {
-            return !(*this == other);
-        }
-    };
-
     // This concept decides what kind of data the message accepts
     template <typename T>
     concept Message_data_concept = std::is_standard_layout_v<T>;
@@ -133,7 +105,7 @@ namespace Net
         template <Message_data_concept Data_type>
         friend Message& operator<<(Message& message, const Data_type& data)
         {
-            message.push_back(data);
+            message.push_back<Data_type>(data);
             return message;
         }
 
@@ -141,7 +113,7 @@ namespace Net
         template <Message_data_concept Data_type>
         friend Message& operator>>(Message& message, Data_type& data)
         {
-            data = message.extract();
+            data = message.extract<Data_type>();
             return message;
         }
 
@@ -153,6 +125,21 @@ namespace Net
         [[nodiscard]] bool operator!=(const Message& other) const noexcept
         {
             return !(*this == other);
+        }
+
+        /** 
+        *   Sets internal id of the message.
+        *   This should never be called outside the framework.
+        */
+        void set_internal_id(Internal_id new_internal_id) noexcept
+        {
+            m_header.m_internal_id = new_internal_id;
+        }
+
+        // Outside of framework this should always be not_internal
+        [[nodiscard]] Internal_id get_internal_id() const noexcept
+        {
+            return m_header.m_internal_id;
         }
 
         [[nodiscard]] Id_type get_id() const noexcept

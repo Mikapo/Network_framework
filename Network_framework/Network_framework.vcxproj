@@ -141,6 +141,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Source\Message\Message_converter.h" />
+    <ClInclude Include="Source\Message\Message_header.h" />
     <ClInclude Include="Source\Utility\Client_information.h" />
     <ClInclude Include="Source\Utility\Common.h" />
     <ClInclude Include="Source\Utility\Delegate.h" />
@@ -162,8 +164,8 @@
     <ClInclude Include="Source\User\User.h" />
     <ClInclude Include="Source\User\Server.h" />
     <ClInclude Include="Source\Utility\Net_common.h" />
-    <ClInclude Include="Source\Utility\Message.h" />
-    <ClInclude Include="Source\Utility\Owned_message.h" />
+    <ClInclude Include="Source\Message\Message.h" />
+    <ClInclude Include="Source\Message\Owned_message.h" />
     <ClInclude Include="Source\Utility\Thread_safe_deque.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

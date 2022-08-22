@@ -1,9 +1,10 @@
 #pragma once
 
 #include "../Connection/Connection.h"
+#include "../Message/Message_converter.h"
+#include "../Message/Owned_message.h"
 #include "../Utility/Common.h"
 #include "../Utility/Delegate.h"
-#include "../Utility/Message.h"
 #include "../Utility/Thread_safe_deque.h"
 #include <chrono>
 #include <concepts>
@@ -34,14 +35,14 @@ namespace Net
         User& operator=(User&&) = delete;
 
         /**
-        *   Add message id that gets accepted. By default, all messages id's are not accepted
-        *   and if you receive an unaccepted message, you get disconnected.
-        *   This also allows you to put size limits on the messages.
-        *
-        *   @param the type to be accepted
-        *   @param the min message size
-        *   @param the max message size
-        */
+         *   Add message id that gets accepted. By default, all messages id's are not accepted
+         *   and if you receive an unaccepted message, you get disconnected.
+         *   This also allows you to put size limits on the messages.
+         *
+         *   @param the type to be accepted
+         *   @param the min message size
+         *   @param the max message size
+         */
         void add_accepted_message(Id_type type, uint32_t min = 0, uint32_t max = std::numeric_limits<uint32_t>::max())
         {
             const Message_limits limits = {.m_min = min, .m_max = max};
@@ -49,12 +50,12 @@ namespace Net
         }
 
         /**
-        *   Handle everything received through internet
-        *   
-        *   @param the max items handled
-        *   @param should the function wait if there is no items to handle
-        *   @param optional interval for checking connections. If you don't give this there will be no checking
-        */
+         *   Handle everything received through internet
+         *
+         *   @param the max items handled
+         *   @param should the function wait if there is no items to handle
+         *   @param optional interval for checking connections. If you don't give this there will be no checking
+         */
         virtual void update(
             size_t max_handled_items = SIZE_T_MAX, bool wait = false,
             Optional_seconds check_connections_interval = Optional_seconds())
@@ -80,10 +81,10 @@ namespace Net
         }
 
         /**
-        * Thread safe pop_front
-        * 
-        * @return message from in queue
-        */ 
+         * Thread safe pop_front
+         *
+         * @return message from in queue
+         */
         [[nodiscard]] Owned_message<Id_type> in_queue_pop_front()
         {
             return m_in_queue.pop_back();
@@ -94,7 +95,6 @@ namespace Net
             m_wait_condition.notify_one();
         }
 
-
         // Thread safe push back to queue
         void in_queue_push_back(Owned_message<Id_type> message)
         {
@@ -103,7 +103,7 @@ namespace Net
         }
 
         // Thread safe push back to queue
-        void notifications_push_back(const std::string& message, Severity severity = Severity::notification)
+        void notifications_push_back(std::string message, Severity severity = Severity::notification)
         {
             if (!m_on_notification.has_been_set())
                 return;
@@ -113,11 +113,11 @@ namespace Net
             notify_wait();
         }
 
-        /**    
-        *   Starts the asio thread and setups the Asio to handle async task'
-        * 
-        *   @throws if the Asio thread was already running
-        */
+        /**
+         *   Starts the asio thread and setups the Asio to handle async task'
+         *
+         *   @throws if the Asio thread was already running
+         */
         void start_asio_thread()
         {
             if (!m_asio_thread_handle.joinable())
@@ -145,12 +145,12 @@ namespace Net
             }
         }
 
-        /** 
-        *   Creates new connection object  
-        *   
-        *   @param the arguments for the connection constructor
-        *   @return unique_ptr to the connection object
-        */
+        /**
+         *   Creates new connection object
+         *
+         *   @param the arguments for the connection constructor
+         *   @return unique_ptr to the connection object
+         */
         template <typename... Argtypes>
         [[nodiscard]] std::unique_ptr<Connection<Id_type>> create_connection(
             Argtypes... Connection_constructor_arguments)
@@ -235,11 +235,11 @@ namespace Net
                 m_asio_context.run();
         }
 
-        /** 
-        *   Gives async job to the Asio
-        * 
-        *   @throws if the asio thread is not running
-        */
+        /**
+         *   Gives async job to the Asio
+         *
+         *   @throws if the asio thread is not running
+         */
         template <typename Func_type>
         void give_job_to_asio(Func_type job)
         {
@@ -250,12 +250,12 @@ namespace Net
         }
 
         /**
-        * Checks if enough time has passed for checking all connections
-        * Otherwise will wait if needed.
-        * 
-        * @param should wait
-        * @param interval between connection checks
-        */
+         * Checks if enough time has passed for checking all connections
+         * Otherwise will wait if needed.
+         *
+         * @param should wait
+         * @param interval between connection checks
+         */
         void handle_check_connections_delay(bool wait, Seconds interval)
         {
             using namespace std::chrono;
@@ -292,7 +292,6 @@ namespace Net
         std::condition_variable m_wait_condition;
         std::mutex m_wait_mutex;
         std::chrono::steady_clock::time_point m_last_connection_check;
-
 
         // Accepted message types
         std::shared_ptr<Accepted_messages_container> m_accepted_messages;

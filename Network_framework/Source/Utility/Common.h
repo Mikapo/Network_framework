@@ -25,10 +25,6 @@ namespace Net
     // The protocol that we currently use in this framework
     using Protocol = asio::ip::tcp;
 
-    // The concept for the message id type
-    template <typename T>
-    concept Id_concept = std::is_enum_v<T>;
-
     // Notification severities
     enum class Severity : uint8_t
     {

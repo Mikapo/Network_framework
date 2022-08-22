@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Client_information.h"
+#include "../Utility/Client_information.h"
 #include "Message.h"
 
 namespace Net

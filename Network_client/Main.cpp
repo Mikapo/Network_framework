@@ -21,6 +21,12 @@ Net::Thread_safe_deque<Net::Message<Message_id>> messages;
 // Client object that handles the client networking
 Net::Client<Message_id> client;
 
+// Event when framework gives notification
+void client_notification(std::string_view notification, Net::Severity severity)
+{
+    std::cout << notification << "\n";
+}
+
 // Event when received the message
 void client_on_message(Net::Message<Message_id> message)
 {
@@ -37,9 +43,25 @@ void client_on_message(Net::Message<Message_id> message)
     }
 }
 
+// Sends user selected name to the server
+void send_name()
+{
+    std::cout << "Please enter your username: ";
+    std::string username;
+    std::getline(std::cin, username);
+
+    Net::Message<Message_id> message;
+    message.set_id(Message_id::client_set_name);
+    message.push_back_string(username);
+
+    client.send_message(message);
+}
+
 // Seperate thread to read input from user for messages
 void send_thread()
 {
+    send_name();
+
     while (!send_thread_exit_flag)
     {
         std::string message;
@@ -54,20 +76,6 @@ void send_thread()
 
         messages.push_back(net_message);
     }
-}
-
-// Sends user selected name to the server
-void send_name()
-{
-    std::cout << "Please enter your username: ";
-    std::string username;
-    std::getline(std::cin, username);
-
-    Net::Message<Message_id> message;
-    message.set_id(Message_id::client_set_name);
-    message.push_back_string(username);
-
-    client.send_message(message);
 }
 
 // Main logic loop for client
@@ -96,6 +104,7 @@ void start_client()
     // Setups client accepted messages and callbacks
     client.add_accepted_message(Message_id::server_message);
     client.m_on_message.set_callback(client_on_message);
+    client.m_on_notification.set_callback(client_notification);
 
     // Attempts to connect to the server
     client.connect(server_ip, server_port);
@@ -103,8 +112,7 @@ void start_client()
     if (client.is_connected())
     {
         std::cout << "Connected succefully \n";
-        send_name();
-
+      
         // Starts new thread for reading inputs from the user
         std::thread thread = std::thread(send_thread);
 

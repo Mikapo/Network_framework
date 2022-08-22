@@ -1,8 +1,8 @@
 #pragma once
 
+#include "../Message/Owned_message.h"
 #include "../Utility/Common.h"
 #include "../Utility/Delegate.h"
-#include "../Utility/Owned_message.h"
 #include "../Utility/Thread_safe_deque.h"
 #include <unordered_map>
 
@@ -85,7 +85,7 @@ namespace Net
             return m_ip;
         }
 
-        // This should always be called from Asio thread
+        // This should always be called from the Asio thread
         void send_message(Message<Id_type> message)
         {
             const bool is_writing_message = !m_out_queue.empty();
@@ -105,11 +105,11 @@ namespace Net
         Delegate<Owned_message<Id_type>> m_on_message;
 
     private:
-        /** 
-        *   Connects to remote in async way and starts waiting for messages after
-        * 
-        *   @param the endpoint where to connect
-        */
+        /**
+         *   Connects to remote in async way and starts waiting for messages after
+         *
+         *   @param the endpoint where to connect
+         */
         void async_connect(const End_points& endpoints)
         {
             asio::async_connect(
@@ -137,6 +137,9 @@ namespace Net
         {
             if (header.m_validation_key != Message_header<Id_type>::CONSTANT_VALIDATION_KEY)
                 return false;
+
+            if (header.m_internal_id != Internal_id::not_internal)
+                return true; // todo add spesific validation for internal messages
 
             if (m_accepted_messages != nullptr)
             {
@@ -222,7 +225,7 @@ namespace Net
                         disconnect(std::format("Write header failed because {}", error.message()), true);
                 });
         }
-        
+
         // Sends the message body over internet in async way
         void async_write_body()
         {
