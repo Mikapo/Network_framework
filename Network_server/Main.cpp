@@ -77,17 +77,31 @@ void server_on_message(Net::Client_information client, Net::Message<Message_id> 
 
 int main()
 {
-    // Setups accepted messages and callbacks
-    server.add_accepted_message(Message_id::client_set_name);
-    server.add_accepted_message(Message_id::client_message);
+    try
+    {
+        // Setups accepted messages and callbacks
+        server.add_accepted_message(Message_id::client_set_name);
+        server.add_accepted_message(Message_id::client_message);
 
-    server.m_on_notification.set_callback(server_notification);
-    server.m_on_message.set_callback(server_on_message);
+        server.m_on_notification.set_callback(server_notification);
+        server.m_on_message.set_callback(server_on_message);
 
-    // Starts the server
-    server.start();
+        // setup ssl stuff
+        server.set_ssl_certificate_chain_file("server.crt");
+        server.set_ssl_private_key_file("server.key");
+        server.set_ssl_tmp_dh_file("dh512.pem");
 
-    // Main update loop for the server
-    while (true)
-        server.update(10, true, std::chrono::seconds(30));
+        // Starts the server
+        server.start();
+
+        // Main update loop for the server
+        while (true)
+            server.update(10, true, std::chrono::seconds(30));
+    }
+    catch (const std::exception& exception)
+    {
+        std::cout << "Exception: " << exception.what() << "\n";
+        std::cout << "Press enter to exit.. \n";
+        std::cin.get();
+    }
 }

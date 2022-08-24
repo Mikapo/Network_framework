@@ -15,6 +15,7 @@ namespace Net
 
         Client() noexcept
         {
+            this->set_ssl_verify_mode(asio::ssl::context::verify_peer);
         }
 
         ~Client() override
@@ -40,7 +41,7 @@ namespace Net
                 auto endpoints = resolver.resolve(host, port);
 
                 // Creates the connection and passes the endpoints to it for connecting
-                m_connection = this->create_connection(this->create_socket(), 0, std::ref(endpoints));
+                m_connection = this->create_connection(0, Handshake_type::client, std::ref(endpoints));
 
                 this->start_asio_thread();
             }
@@ -90,7 +91,7 @@ namespace Net
         // Sends the message to the server or does nothing if not connected
         void send_message(Message<Id_type> message)
         {
-            if (m_has_received_server_data && is_connected())
+            if (is_connected())
                 this->async_send_message_to_connection(m_connection.get(), std::move(message));
         }
 

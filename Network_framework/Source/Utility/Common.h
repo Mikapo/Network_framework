@@ -13,17 +13,17 @@
 #include "asio.hpp"
 #include "asio/buffer.hpp"
 #include "asio/socket_base.hpp"
-#include <concepts>
+#include "asio/ssl.hpp"
 #include <limits>
-#include <type_traits>
-#include <stdexcept>
 
 namespace Net
 {
     static constexpr size_t SIZE_T_MAX = std::numeric_limits<size_t>::max();
 
-    // The protocol that we currently use in this framework
+    // The Asio types that we currently use in this framework
     using Protocol = asio::ip::tcp;
+    using Socket = Protocol::socket;
+    using Encrypted_socket = asio::ssl::stream<Socket>;
 
     // Notification severities
     enum class Severity : uint8_t

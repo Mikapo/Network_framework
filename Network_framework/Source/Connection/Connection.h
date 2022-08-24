@@ -13,6 +13,12 @@ namespace Net
         uint32_t m_min = 0, m_max = 0;
     };
 
+    enum class Handshake_type : uint8_t
+    {
+        client,
+        server
+    };
+
     // Class that repesents remote net connection
     template <Id_concept Id_type>
     class Connection
@@ -27,12 +33,13 @@ namespace Net
          *   @param the socket that is already connected to remote
          *   @param unique id for the connection
          */
-        Connection(Protocol::socket socket, uint32_t connection_id) : m_socket(std::move(socket)), m_id(connection_id)
+        Connection(Encrypted_socket socket, uint32_t connection_id, Handshake_type handshake_type)
+            : m_id(connection_id), m_handshake_type(handshake_type), m_encrypted_socket(std::move(socket))
         {
             if (is_connected())
             {
                 update_ip();
-                async_read_header();
+                async_handshake();
             }
         }
 
@@ -44,8 +51,10 @@ namespace Net
          *   @param unique id for the connection
          *   @param the endpoints where to connect
          */
-        Connection(Protocol::socket socket, uint32_t connection_id, const End_points& end_points)
-            : m_id(connection_id), m_socket(std::move(socket))
+        Connection(
+            Encrypted_socket socket, uint32_t connection_id, Handshake_type handshake_type,
+            const End_points& end_points)
+            : m_id(connection_id), m_handshake_type(handshake_type), m_encrypted_socket(std::move(socket))
         {
             async_connect(end_points);
         }
@@ -65,14 +74,14 @@ namespace Net
                 if (!reason.empty())
                     m_on_notification.broadcast(reason, is_error ? Severity::error : Severity::notification);
 
-                m_socket.shutdown(asio::socket_base::shutdown_both);
-                m_socket.close();
+                m_encrypted_socket.lowest_layer().shutdown(asio::socket_base::shutdown_both);
+                m_encrypted_socket.lowest_layer().close();
             }
         }
 
         [[nodiscard]] bool is_connected() const
         {
-            return m_socket.is_open();
+            return m_encrypted_socket.lowest_layer().is_open();
         }
 
         [[nodiscard]] uint32_t get_id() const noexcept
@@ -113,14 +122,15 @@ namespace Net
         void async_connect(const End_points& endpoints)
         {
             asio::async_connect(
-                m_socket, endpoints, [this](asio::error_code error, const Protocol::endpoint& endpoint) {
+                m_encrypted_socket.lowest_layer(), endpoints,
+                [this](asio::error_code error, const Protocol::endpoint& endpoint) {
                     if (!error)
                     {
                         update_ip();
                         m_on_notification.broadcast(
                             std::format("Connected sucesfully to {}", get_ip()), Severity::notification);
 
-                        async_read_header();
+                        async_handshake();
                     }
                 });
         }
@@ -129,7 +139,27 @@ namespace Net
         void update_ip()
         {
             if (is_connected())
-                m_ip = m_socket.remote_endpoint().address().to_string();
+                m_ip = m_encrypted_socket.lowest_layer().remote_endpoint().address().to_string();
+        }
+
+        // Async peforms handshake with the remote and starts waiting for the messages after
+        void async_handshake()
+        {
+            auto handshake_task = [this](asio::error_code error) {
+                if (!error)
+                {
+                    m_on_notification.broadcast(
+                        std::format("Succesfull handshake with {}", get_ip()), Severity::notification);
+                    async_read_header();
+                }
+                else
+                    disconnect(std::format("Error on handshake because {}", error.message()), true);
+            };
+
+            if (m_handshake_type == Handshake_type::client)
+                m_encrypted_socket.async_handshake(asio::ssl::stream_base::client, handshake_task);
+            else if (m_handshake_type == Handshake_type::server)
+                m_encrypted_socket.async_handshake(asio::ssl::stream_base::server, handshake_task);
         }
 
         // Checks if the header is in valid format
@@ -161,7 +191,7 @@ namespace Net
             m_received_message.m_header.m_validation_key = 0;
 
             asio::async_read(
-                m_socket, asio::buffer(&m_received_message.m_header, sizeof(Message_header<Id_type>)),
+                m_encrypted_socket, asio::buffer(&m_received_message.m_header, sizeof(Message_header<Id_type>)),
                 [this](asio::error_code error, [[maybe_unused]] size_t size) {
                     if (!error)
                     {
@@ -191,7 +221,7 @@ namespace Net
         void async_read_body()
         {
             asio::async_read(
-                m_socket, asio::buffer(m_received_message.m_body.data(), m_received_message.m_body.size()),
+                m_encrypted_socket, asio::buffer(m_received_message.m_body.data(), m_received_message.m_body.size()),
                 [this](asio::error_code error, [[maybe_unused]] size_t size) {
                     if (!error)
                     {
@@ -206,8 +236,9 @@ namespace Net
         // Sends the message header over internet in async way
         void async_write_header()
         {
+
             asio::async_write(
-                m_socket, asio::buffer(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>)),
+                m_encrypted_socket, asio::buffer(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>)),
                 [this](asio::error_code error, [[maybe_unused]] size_t size) {
                     if (!error)
                     {
@@ -230,7 +261,7 @@ namespace Net
         void async_write_body()
         {
             asio::async_write(
-                m_socket, asio::buffer(m_out_queue.front().m_body.data(), m_out_queue.front().m_body.size()),
+                m_encrypted_socket, asio::buffer(m_out_queue.front().m_body.data(), m_out_queue.front().m_body.size()),
                 [this](asio::error_code error, [[maybe_unused]] size_t size) {
                     if (!error)
                     {
@@ -255,7 +286,9 @@ namespace Net
 
         const uint32_t m_id = 0;
         std::string m_ip = "0.0.0.0";
-        Protocol::socket m_socket;
+
+        Encrypted_socket m_encrypted_socket;
+        const Handshake_type m_handshake_type = Handshake_type::client;
 
         Message<Id_type> m_received_message;
         Thread_safe_deque<Message<Id_type>> m_out_queue;

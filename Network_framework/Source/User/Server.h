@@ -18,6 +18,9 @@ namespace Net
 
         explicit Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
         {
+            this->set_ssl_password_callback([this](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
+                return get_password(size, purpose);
+            });
         }
 
         virtual ~Server()
@@ -139,6 +142,16 @@ namespace Net
             std::unique_ptr<Connection<Id_type>> m_connection = nullptr;
         };
 
+        /**
+         *   Gets ssl password
+         *   todo needs actual way to add passwords to server
+         */
+        [[nodiscard]] std::string get_password(
+            [[maybe_unused]] std::size_t size, [[maybe_unused]] asio::ssl::context_base::password_purpose purpose) const
+        {
+            return "temp password";
+        }
+
         // Triggers the on message callback for the every message
         void handle_received_messages(size_t max_messages)
         {
@@ -176,7 +189,7 @@ namespace Net
         void setup_client(std::unique_ptr<Connection<Id_type>> connection, uint32_t unique_id)
         {
             auto accept_message = Message_converter<Id_type>::create_server_data({unique_id});
-            this->async_send_message_to_connection(connection.get(), std::move(accept_message));
+           // this->async_send_message_to_connection(connection.get(), std::move(accept_message));
 
             Client_data client = {std::move(connection)};
             m_clients.emplace(unique_id, std::move(client));
@@ -196,7 +209,8 @@ namespace Net
 
             if (client_accepted)
             {
-                auto new_connection = this->create_connection(std::move(socket), client_id);
+                auto new_connection =
+                    this->create_connection_from_socket(std::move(socket), client_id, Handshake_type::server);
 
                 this->notifications_push_back(
                     std::format("Client with ip {} was accepted and assigned ip {} to it", client_ip, client_id));

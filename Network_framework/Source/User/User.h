@@ -22,7 +22,7 @@ namespace Net
         using Optional_seconds = std::optional<Seconds>;
         using Accepted_messages_container = std::unordered_map<Id_type, Message_limits>;
 
-        User()
+        User() : m_ssl_context(asio::ssl::context::sslv23)
         {
             m_accepted_messages = std::make_shared<Accepted_messages_container>();
         }
@@ -33,6 +33,30 @@ namespace Net
         User(User&&) = delete;
         User& operator=(const User&) = delete;
         User& operator=(User&&) = delete;
+
+        // Sets ssl certificate chain file
+        void set_ssl_certificate_chain_file(const std::string& path)
+        {
+            m_ssl_context.use_certificate_chain_file(path);
+        }
+
+        // Sets ssl private key file in .pem format
+        void set_ssl_private_key_file(const std::string& path)
+        {
+            m_ssl_context.use_private_key_file(path, asio::ssl::context::pem);
+        }
+
+        // Sets ssl tmp dh file
+        void set_ssl_tmp_dh_file(const std::string& path)
+        {
+            m_ssl_context.use_tmp_dh_file(path);
+        }
+
+        // Sets ssl verify file
+        void set_ssl_verify_file(const std::string& path)
+        {
+            m_ssl_context.load_verify_file(path);
+        }
 
         /**
          *   Add message id that gets accepted. By default, all messages id's are not accepted
@@ -75,6 +99,19 @@ namespace Net
         Delegate<std::string_view, Severity> m_on_notification;
 
     protected:
+        template<typename Verify_type>
+        void set_ssl_verify_mode(Verify_type new_verify_mode)
+        {
+            m_ssl_context.set_verify_mode(new_verify_mode);
+        }
+
+        // Sets ssl pasword callback
+        template<typename Func_type>
+        void set_ssl_password_callback(const Func_type& func)
+        {
+            m_ssl_context.set_password_callback(func);
+        }
+
         bool is_in_queue_empty()
         {
             return m_in_queue.empty();
@@ -145,18 +182,34 @@ namespace Net
             }
         }
 
+        /*
+        * Creates socket and connection for it
+        * 
+        * @param arguments for the connection
+        * @retúrn unique_ptr to the connection obj
+        */
+        template<typename... Argtypes>
+        [[nodiscard]] std::unique_ptr<Connection<Id_type>> create_connection(Argtypes... args)
+        {
+            Protocol::socket socket(m_asio_context);
+            return create_connection_from_socket(std::move(socket), std::forward<Argtypes>(args)...);
+        }
+
         /**
-         *   Creates new connection object
+         *   Creates new connection object from socket
          *
+         *   @param socket where to create the connection from
          *   @param the arguments for the connection constructor
          *   @return unique_ptr to the connection object
          */
         template <typename... Argtypes>
-        [[nodiscard]] std::unique_ptr<Connection<Id_type>> create_connection(
-            Argtypes... Connection_constructor_arguments)
+        [[nodiscard]] std::unique_ptr<Connection<Id_type>> create_connection_from_socket(
+            Protocol::socket socket, Argtypes... Connection_constructor_arguments)
         {
+            Encrypted_socket encrypted_socket(std::move(socket), m_ssl_context);
+
             std::unique_ptr new_connection =
-                std::make_unique<Connection<Id_type>>(std::forward<Argtypes>(Connection_constructor_arguments)...);
+                std::make_unique<Connection<Id_type>>(std::move(encrypted_socket), std::forward<Argtypes>(Connection_constructor_arguments)...);
 
             // Setups the callbacks
             new_connection->m_on_message.set_callback(
@@ -169,11 +222,6 @@ namespace Net
             new_connection->set_accepted_messages(m_accepted_messages);
 
             return new_connection;
-        }
-
-        [[nodiscard]] Protocol::socket create_socket()
-        {
-            return Protocol::socket(m_asio_context);
         }
 
         [[nodiscard]] Protocol::resolver create_resolver()
@@ -285,6 +333,7 @@ namespace Net
         virtual void check_connections(){};
 
         asio::io_context m_asio_context;
+        asio::ssl::context m_ssl_context;
 
         std::thread m_asio_thread_handle;
         bool m_asio_thread_stop_flag = true;

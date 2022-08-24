@@ -106,6 +106,9 @@ void start_client()
     client.m_on_message.set_callback(client_on_message);
     client.m_on_notification.set_callback(client_notification);
 
+    // Setup ssl stuff
+    client.set_ssl_verify_file("server.crt");
+
     // Attempts to connect to the server
     client.connect(server_ip, server_port);
 
