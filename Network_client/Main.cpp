@@ -2,10 +2,10 @@
 #include <iostream>
 #include <string>
 
-/** 
-*   Different id's for the messages that are send over the internet.
-*   Needs to be same for client and the servers.
-*/
+/**
+ *   Different id's for the messages that are send over the internet.
+ *   Needs to be same for client and the servers.
+ */
 enum class Message_id : uint8_t
 {
     client_set_name,
@@ -20,6 +20,9 @@ Net::Thread_safe_deque<Net::Message<Message_id>> messages;
 
 // Client object that handles the client networking
 Net::Client<Message_id> client;
+
+// Thread for reading inputs so it will not block the client
+std::thread thread;
 
 // Event when framework gives notification
 void client_notification(std::string_view notification, Net::Severity severity)
@@ -78,10 +81,17 @@ void send_thread()
     }
 }
 
+// Event_when connected to server
+void on_connected()
+{
+    // Starts new thread for reading inputs from the user
+    thread = std::thread(send_thread);
+}
+
 // Main logic loop for client
 void main_loop()
 {
-    while (client.is_connected())
+    while (true)
     {
         client.update();
 
@@ -105,6 +115,7 @@ void start_client()
     client.add_accepted_message(Message_id::server_message);
     client.m_on_message.set_callback(client_on_message);
     client.m_on_notification.set_callback(client_notification);
+    client.m_on_connected.set_callback(on_connected);
 
     // Setup ssl stuff
     client.set_ssl_verify_file("server.crt");
@@ -112,21 +123,14 @@ void start_client()
     // Attempts to connect to the server
     client.connect(server_ip, server_port);
 
-    if (client.is_connected())
-    {
-        std::cout << "Connected succefully \n";
-      
-        // Starts new thread for reading inputs from the user
-        std::thread thread = std::thread(send_thread);
+    main_loop();
 
-        main_loop();
+    // Stops the send thread
+    send_thread_exit_flag = true;
 
-        // Stops the send thread
-        send_thread_exit_flag = true;
+    if (thread.joinable())
+        thread.join();
 
-        if (thread.joinable())
-            thread.join();
-    }
     else
     {
         std::cout << "failed to connect \n";

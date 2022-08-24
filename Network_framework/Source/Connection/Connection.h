@@ -27,12 +27,6 @@ namespace Net
         using Accepted_messages_ptr = std::shared_ptr<const std::unordered_map<Id_type, Message_limits>>;
         using End_points = Protocol::resolver::results_type;
 
-        /**
-         *   The constructor for the socket that is already connected to remote
-         *
-         *   @param the socket that is already connected to remote
-         *   @param unique id for the connection
-         */
         Connection(Encrypted_socket socket, uint32_t connection_id, Handshake_type handshake_type)
             : m_id(connection_id), m_handshake_type(handshake_type), m_encrypted_socket(std::move(socket))
         {
@@ -41,22 +35,6 @@ namespace Net
                 update_ip();
                 async_handshake();
             }
-        }
-
-        /**
-         *   The constructor for socket that is not conncted to remote.
-         *   This constructor will try to connect using the endpoints
-         *
-         *   @param the unconneccted socket
-         *   @param unique id for the connection
-         *   @param the endpoints where to connect
-         */
-        Connection(
-            Encrypted_socket socket, uint32_t connection_id, Handshake_type handshake_type,
-            const End_points& end_points)
-            : m_id(connection_id), m_handshake_type(handshake_type), m_encrypted_socket(std::move(socket))
-        {
-            async_connect(end_points);
         }
 
         Connection(const Connection&) = delete;
@@ -97,12 +75,8 @@ namespace Net
         // This should always be called from the Asio thread
         void send_message(Message<Id_type> message)
         {
-            const bool is_writing_message = !m_out_queue.empty();
-
             m_out_queue.push_back(std::move(message));
-
-            if (!is_writing_message)
-                async_write_header();
+            start_writing_message();
         }
 
         void set_accepted_messages(Accepted_messages_ptr accepted_messages) noexcept
@@ -114,27 +88,6 @@ namespace Net
         Delegate<Owned_message<Id_type>> m_on_message;
 
     private:
-        /**
-         *   Connects to remote in async way and starts waiting for messages after
-         *
-         *   @param the endpoint where to connect
-         */
-        void async_connect(const End_points& endpoints)
-        {
-            asio::async_connect(
-                m_encrypted_socket.lowest_layer(), endpoints,
-                [this](asio::error_code error, const Protocol::endpoint& endpoint) {
-                    if (!error)
-                    {
-                        update_ip();
-                        m_on_notification.broadcast(
-                            std::format("Connected sucesfully to {}", get_ip()), Severity::notification);
-
-                        async_handshake();
-                    }
-                });
-        }
-
         // Updates m_ip member with the current remote ip
         void update_ip()
         {
@@ -148,18 +101,32 @@ namespace Net
             auto handshake_task = [this](asio::error_code error) {
                 if (!error)
                 {
+                    m_has_done_handshake = true;
+
                     m_on_notification.broadcast(
                         std::format("Succesfull handshake with {}", get_ip()), Severity::notification);
+
+                    // Starts to wait messages
                     async_read_header();
+
+                    // If received any messages to be sent during the handshake, we send them now
+                    start_writing_message();
                 }
                 else
                     disconnect(std::format("Error on handshake because {}", error.message()), true);
             };
 
-            if (m_handshake_type == Handshake_type::client)
+            switch (m_handshake_type)
+            {
+            case Handshake_type::client:
                 m_encrypted_socket.async_handshake(asio::ssl::stream_base::client, handshake_task);
-            else if (m_handshake_type == Handshake_type::server)
+                break;
+            case Handshake_type::server:
                 m_encrypted_socket.async_handshake(asio::ssl::stream_base::server, handshake_task);
+                break;
+            default:
+                break;
+            }      
         }
 
         // Checks if the header is in valid format
@@ -233,9 +200,17 @@ namespace Net
                 });
         }
 
+        // Starts writing message if possible otherwise does nothing
+        void start_writing_message()
+        {
+            if (!m_out_queue.empty() && !m_is_writing_message && m_has_done_handshake)
+                async_write_header();
+        }
+
         // Sends the message header over internet in async way
         void async_write_header()
         {
+            m_is_writing_message = true;
 
             asio::async_write(
                 m_encrypted_socket, asio::buffer(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>)),
@@ -250,6 +225,8 @@ namespace Net
 
                             if (!m_out_queue.empty())
                                 async_write_header();
+                            else
+                                m_is_writing_message = false;
                         }
                     }
                     else
@@ -269,6 +246,8 @@ namespace Net
 
                         if (!m_out_queue.empty())
                             async_write_header();
+                        else
+                            m_is_writing_message = false;
                     }
                     else
                         disconnect(std::format("Write body failed because {}", error.message()), true);
@@ -289,7 +268,9 @@ namespace Net
 
         Encrypted_socket m_encrypted_socket;
         const Handshake_type m_handshake_type = Handshake_type::client;
+        bool m_has_done_handshake = false;
 
+        bool m_is_writing_message = false;
         Message<Id_type> m_received_message;
         Thread_safe_deque<Message<Id_type>> m_out_queue;
         Accepted_messages_ptr m_accepted_messages = nullptr;

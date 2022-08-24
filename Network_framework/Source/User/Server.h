@@ -18,9 +18,10 @@ namespace Net
 
         explicit Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
         {
-            this->set_ssl_password_callback([this](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
-                return get_password(size, purpose);
-            });
+            this->set_ssl_password_callback(
+                [this](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
+                    return get_password(size, purpose);
+                });
         }
 
         virtual ~Server()
@@ -100,7 +101,7 @@ namespace Net
             const auto& connection_ptr = found_client->second.m_connection;
 
             if (connection_ptr->is_connected())
-                this->async_send_message_to_connection(connection_ptr.get(), std::move(message));
+                connection_ptr->send_message(std::move(message));
             else
                 remove_client(found_client);
         }
@@ -115,7 +116,7 @@ namespace Net
                 if (connection->is_connected())
                 {
                     if (connection->get_id() != ignored_client)
-                        this->async_send_message_to_connection(connection.get(), message);
+                        connection->send_message(message);
 
                     ++client_iterator;
                 }
@@ -124,7 +125,12 @@ namespace Net
             }
         }
 
+        /** T
+         *   This event allows you to disconnect just connected client.
+         *   Note that client is not yet valid during this event so all methods like disconnect does not work on them.
+         */
         Delegate<const Client_information&, bool&> m_on_client_connect;
+
         Delegate<const Client_information&> m_on_client_disconnect;
         Delegate<const Client_information&, Message<Id_type>> m_on_message;
 
@@ -189,7 +195,7 @@ namespace Net
         void setup_client(std::unique_ptr<Connection<Id_type>> connection, uint32_t unique_id)
         {
             auto accept_message = Message_converter<Id_type>::create_server_data({unique_id});
-           // this->async_send_message_to_connection(connection.get(), std::move(accept_message));
+            connection->send_message(accept_message);
 
             Client_data client = {std::move(connection)};
             m_clients.emplace(unique_id, std::move(client));
@@ -209,8 +215,7 @@ namespace Net
 
             if (client_accepted)
             {
-                auto new_connection =
-                    this->create_connection_from_socket(std::move(socket), client_id, Handshake_type::server);
+                auto new_connection = this->create_connection(std::move(socket), client_id, Handshake_type::server);
 
                 this->notifications_push_back(
                     std::format("Client with ip {} was accepted and assigned ip {} to it", client_ip, client_id));

@@ -93,5 +93,11 @@
     <ClInclude Include="Source\Message\Message_converter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Asio_base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\User\Asio_base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -13,7 +13,7 @@ namespace Net
     public:
         using Optional_seconds = std::optional<std::chrono::seconds>;
 
-        Client() noexcept
+        Client() : m_temp_socket(this->create_encrypted_socket())
         {
             this->set_ssl_verify_mode(asio::ssl::context::verify_peer);
         }
@@ -39,9 +39,7 @@ namespace Net
                 m_has_received_server_data = false;
                 Protocol::resolver resolver = this->create_resolver();
                 auto endpoints = resolver.resolve(host, port);
-
-                // Creates the connection and passes the endpoints to it for connecting
-                m_connection = this->create_connection(0, Handshake_type::client, std::ref(endpoints));
+                async_connect(endpoints);
 
                 this->start_asio_thread();
             }
@@ -92,15 +90,31 @@ namespace Net
         void send_message(Message<Id_type> message)
         {
             if (is_connected())
-                this->async_send_message_to_connection(m_connection.get(), std::move(message));
+                m_connection->send_message(std::move(message));
         }
 
-        //You can only start sending messages to server after this event
+        // You can only start sending messages to server after this event
         Delegate<> m_on_connected;
 
         Delegate<Message<Id_type>> m_on_message;
 
     private:
+        void async_connect(Protocol::resolver::results_type endpoints)
+        {
+            m_temp_socket = this->create_encrypted_socket();
+            asio::async_connect(
+                m_temp_socket.lowest_layer(), endpoints,
+                [this](asio::error_code error, const Protocol::endpoint& endpoint) {
+                    if (!error)
+                    {
+                        m_connection = this->create_connection(std::move(m_temp_socket), 0, Handshake_type::client);
+                    }
+                    else
+                        this->notifications_push_back(
+                            std::format("Error on connection because {}", error.message()), Severity::error);
+                });
+        }
+
         // Triggers the on message callback for all the received messages
         void handle_received_messages(size_t max_messages)
         {
@@ -137,6 +151,7 @@ namespace Net
             }
         }
 
+        Encrypted_socket m_temp_socket;
         std::unique_ptr<Connection<Id_type>> m_connection;
 
         uint32_t m_remote_id = 0;
