@@ -141,9 +141,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Asio_base.h" />
     <ClInclude Include="Source\Message\Message_converter.h" />
     <ClInclude Include="Source\Message\Message_header.h" />
+    <ClInclude Include="Source\Sockets\Socket.h" />
+    <ClInclude Include="Source\Sockets\Socket_interface.h" />
     <ClInclude Include="Source\User\Asio_base.h" />
     <ClInclude Include="Source\Utility\Client_information.h" />
     <ClInclude Include="Source\Utility\Common.h" />

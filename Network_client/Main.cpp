@@ -85,7 +85,7 @@ void send_thread()
 void on_connected()
 {
     // Starts new thread for reading inputs from the user
-    thread = std::thread(send_thread);
+    thread = std::thread(send_thread);  
 }
 
 // Main logic loop for client
@@ -118,6 +118,7 @@ void start_client()
     client.m_on_connected.set_callback(on_connected);
 
     // Setup ssl stuff
+    client.enable_ssl(true);
     client.set_ssl_verify_file("server.crt");
 
     // Attempts to connect to the server

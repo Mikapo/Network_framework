@@ -24,7 +24,7 @@ constexpr uint16_t port = 1234;
 Net::Server<Message_id> server(port);
 
 // Notifications from the network framework
-void server_notification(std::string_view notification, Net::Severity severity)
+void server_notification(std::string_view notification, [[maybe_unused]] Net::Severity severity)
 {
     std::cout << notification << "\n";
 }
@@ -41,6 +41,8 @@ void on_set_name(uint32_t client_id, Net::Message<Message_id> message)
     net_message.push_back_string(respond);
 
     server.send_message_to_client(client_id, net_message);
+
+    std::cout << "Set name " << name << " for client " << client_id << "\n";
 }
 
 // Handles received chat messages
@@ -56,6 +58,8 @@ void on_chat_message(uint32_t client_id, Net::Message<Message_id> message)
     net_message.push_back_string(formated_message);
 
     server.send_message_to_all_clients(net_message);
+
+    std::cout << formated_message << "\n";
 }
 
 // Event when message is received from the client
@@ -87,6 +91,7 @@ int main()
         server.m_on_message.set_callback(server_on_message);
 
         // setup ssl stuff
+        server.enable_ssl(true);
         server.set_ssl_certificate_chain_file("server.crt");
         server.set_ssl_private_key_file("server.key");
         server.set_ssl_tmp_dh_file("dh512.pem");

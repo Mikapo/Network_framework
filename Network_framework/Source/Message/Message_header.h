@@ -6,10 +6,10 @@
 namespace Net
 {
     // Used to handle messages that are internat to framework
-    enum class Internal_id
+    enum class Internal_id : uint8_t
     {
         not_internal,
-        server_data
+        server_accept
     };
 
     // Type that is used to indicate how large the message is in the header

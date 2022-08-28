@@ -8,7 +8,7 @@ namespace Net
     class Asio_base
     {
     public:
-        Asio_base() : m_ssl_context(asio::ssl::context::sslv23)
+        Asio_base() noexcept : m_ssl_context(asio::ssl::context::sslv23)
         {
         }
 
@@ -68,6 +68,11 @@ namespace Net
         [[nodiscard]] Encrypted_socket create_encrypted_socket(Protocol::socket socket)
         {
             return Encrypted_socket(std::move(socket), m_ssl_context);
+        }
+
+        [[nodiscard]] Protocol::socket create_socket()
+        {
+            return Protocol::socket(m_asio_context);
         }
 
         /**

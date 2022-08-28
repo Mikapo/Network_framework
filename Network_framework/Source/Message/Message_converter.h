@@ -14,11 +14,13 @@ namespace Net
 	class Message_converter
 	{
     public:
+        Message_converter() = delete;
+
 		// Creates message for server_data
-        static Message<Id_type> create_server_data(const Server_data& data)
+        static Message<Id_type> create_server_accept(const Server_data& data)
         {
 			Message<Id_type> output;
-            output.set_internal_id(Internal_id::server_data);
+            output.set_internal_id(Internal_id::server_accept);
             output << data;
             return output;
 		}
@@ -26,11 +28,11 @@ namespace Net
 		/**
 		*	@param	the message that was created with the Create_server_accept method
 		*	@throws if the message internal id is not the server_connection_accepted
-		*	@return data from the message in the Server_accept_data struct
+		*	@return data from the message in the Serverdata struct
 		*/ 
-		static Server_data extract_server_data(Message<Id_type>& in_message)
+		static Server_data extract_server_accept(Message<Id_type>& in_message)
         {
-            if (in_message.get_internal_id() != Internal_id::server_data)
+            if (in_message.get_internal_id() != Internal_id::server_accept)
                 throw std::invalid_argument("Message has wrong id");
 
             Server_data output;

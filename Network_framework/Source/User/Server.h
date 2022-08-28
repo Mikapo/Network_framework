@@ -194,7 +194,7 @@ namespace Net
         // Prepares the client for receiving messages
         void setup_client(std::unique_ptr<Connection<Id_type>> connection, uint32_t unique_id)
         {
-            auto accept_message = Message_converter<Id_type>::create_server_data({unique_id});
+            auto accept_message = Message_converter<Id_type>::create_server_accept({unique_id});
             connection->send_message(accept_message);
 
             Client_data client = {std::move(connection)};

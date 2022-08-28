@@ -1,9 +1,11 @@
 #pragma once
 
 #include "../Message/Owned_message.h"
+#include "../Sockets/Socket_interface.h"
 #include "../Utility/Common.h"
 #include "../Utility/Delegate.h"
 #include "../Utility/Thread_safe_deque.h"
+#include <memory>
 #include <unordered_map>
 
 namespace Net
@@ -11,12 +13,6 @@ namespace Net
     struct Message_limits
     {
         uint32_t m_min = 0, m_max = 0;
-    };
-
-    enum class Handshake_type : uint8_t
-    {
-        client,
-        server
     };
 
     // Class that repesents remote net connection
@@ -27,14 +23,10 @@ namespace Net
         using Accepted_messages_ptr = std::shared_ptr<const std::unordered_map<Id_type, Message_limits>>;
         using End_points = Protocol::resolver::results_type;
 
-        Connection(Encrypted_socket socket, uint32_t connection_id, Handshake_type handshake_type)
-            : m_id(connection_id), m_handshake_type(handshake_type), m_encrypted_socket(std::move(socket))
+        Connection(std::unique_ptr<Socket_interface> socket, uint32_t connection_id)
+            : m_id(connection_id), m_socket(std::move(socket))
         {
-            if (is_connected())
-            {
-                update_ip();
-                async_handshake();
-            }
+           
         }
 
         Connection(const Connection&) = delete;
@@ -45,6 +37,17 @@ namespace Net
         Connection& operator=(const Connection&) = delete;
         Connection& operator=(Connection&&) = delete;
 
+        // Starts the handshake and listening to messages
+        void start(Handshake_type handshake_type)
+        {
+            if (is_connected())
+            {
+                setup_callbacks_on_socket();
+                update_ip();
+                m_socket->async_handshake(handshake_type);
+            }
+        }
+
         void disconnect(const std::string& reason = "", bool is_error = false)
         {
             if (is_connected())
@@ -52,14 +55,13 @@ namespace Net
                 if (!reason.empty())
                     m_on_notification.broadcast(reason, is_error ? Severity::error : Severity::notification);
 
-                m_encrypted_socket.lowest_layer().shutdown(asio::socket_base::shutdown_both);
-                m_encrypted_socket.lowest_layer().close();
+                m_socket->disconnect();
             }
         }
 
         [[nodiscard]] bool is_connected() const
         {
-            return m_encrypted_socket.lowest_layer().is_open();
+            return m_socket->is_open();
         }
 
         [[nodiscard]] uint32_t get_id() const noexcept
@@ -88,45 +90,49 @@ namespace Net
         Delegate<Owned_message<Id_type>> m_on_message;
 
     private:
+        void setup_callbacks_on_socket() noexcept
+        {
+            m_socket->m_handshake_finished.set_callback([this](asio::error_code error){
+                async_handshake_finished(error);});
+
+                m_socket->m_read_header_finished.set_callback([this](asio::error_code error, size_t bytes){
+                async_read_header_finished(error, bytes);});
+
+                m_socket->m_read_body_finished.set_callback([this](asio::error_code error, size_t bytes){
+                async_read_body_finished(error, bytes);});
+
+                m_socket->m_write_header_finished.set_callback([this](asio::error_code error, size_t bytes){
+                async_write_header_finished(error, bytes);});
+
+                 m_socket->m_write_body_finished.set_callback([this](asio::error_code error, size_t bytes){
+                async_write_body_finished(error, bytes);});
+        }
+
         // Updates m_ip member with the current remote ip
         void update_ip()
         {
             if (is_connected())
-                m_ip = m_encrypted_socket.lowest_layer().remote_endpoint().address().to_string();
+                m_ip = m_socket->get_ip();
         }
 
-        // Async peforms handshake with the remote and starts waiting for the messages after
-        void async_handshake()
+        // Events when handshake is finished
+        void async_handshake_finished(asio::error_code error)
         {
-            auto handshake_task = [this](asio::error_code error) {
-                if (!error)
-                {
-                    m_has_done_handshake = true;
-
-                    m_on_notification.broadcast(
-                        std::format("Succesfull handshake with {}", get_ip()), Severity::notification);
-
-                    // Starts to wait messages
-                    async_read_header();
-
-                    // If received any messages to be sent during the handshake, we send them now
-                    start_writing_message();
-                }
-                else
-                    disconnect(std::format("Error on handshake because {}", error.message()), true);
-            };
-
-            switch (m_handshake_type)
+            if (!error)
             {
-            case Handshake_type::client:
-                m_encrypted_socket.async_handshake(asio::ssl::stream_base::client, handshake_task);
-                break;
-            case Handshake_type::server:
-                m_encrypted_socket.async_handshake(asio::ssl::stream_base::server, handshake_task);
-                break;
-            default:
-                break;
-            }      
+                m_has_done_handshake = true;
+
+                m_on_notification.broadcast(
+                    std::format("Succesfull handshake with {}", get_ip()), Severity::notification);
+
+                // Starts to wait messages
+                m_socket->async_read_header(&m_received_message.m_header, sizeof(Message_header<Id_type>));
+
+                // If received any messages to be sent during the handshake, we send them now
+                start_writing_message();
+            }
+            else
+                disconnect(std::format("Error on handshake because {}", error.message()), true);
         }
 
         // Checks if the header is in valid format
@@ -152,106 +158,90 @@ namespace Net
             return true;
         }
 
-        // Waits for the message header and handles it when received
-        void async_read_header()
+        // Event when read header is finished
+        void async_read_header_finished(asio::error_code error, [[maybe_unused]] size_t bytes)
         {
-            m_received_message.m_header.m_validation_key = 0;
+            if (!error)
+            {
+                if (!validate_header(m_received_message.m_header))
+                {
+                    disconnect("Header validation failed", true);
+                    return;
+                }
 
-            asio::async_read(
-                m_encrypted_socket, asio::buffer(&m_received_message.m_header, sizeof(Message_header<Id_type>)),
-                [this](asio::error_code error, [[maybe_unused]] size_t size) {
-                    if (!error)
-                    {
-                        if (!validate_header(m_received_message.m_header))
-                        {
-                            disconnect("Header validation failed", true);
-                            return;
-                        }
+                // Don't read body if size of message is 0
+                if (m_received_message.m_header.m_size == 0)
+                {
+                    on_message_received();
+                    m_socket->async_read_header(&m_received_message.m_header, sizeof(Message_header<Id_type>));
+                    return;
+                }
 
-                        // Don't read body if size of message is 0
-                        if (m_received_message.m_header.m_size == 0)
-                        {
-                            on_message_received();
-                            async_read_header();
-                            return;
-                        }
-
-                        m_received_message.resize_body(m_received_message.m_header.m_size);
-                        async_read_body();
-                    }
-                    else
-                        disconnect(std::format("Read header failed because {}", error.message()), true);
-                });
+                m_received_message.resize_body(m_received_message.m_header.m_size);
+                m_socket->async_read_body(m_received_message.m_body.data(), m_received_message.m_body.size());
+            }
+            else
+                disconnect(std::format("Read header failed because {}", error.message()), true);
         }
 
-        // Waits for the message body and handles it when received
-        void async_read_body()
+        // Event when read body is finished
+        void async_read_body_finished(asio::error_code error, [[maybe_unused]] size_t bytes)
         {
-            asio::async_read(
-                m_encrypted_socket, asio::buffer(m_received_message.m_body.data(), m_received_message.m_body.size()),
-                [this](asio::error_code error, [[maybe_unused]] size_t size) {
-                    if (!error)
-                    {
-                        on_message_received();
-                        async_read_header();
-                    }
-                    else
-                        disconnect(std::format("Read body failed because {}", error.message()), true);
-                });
+            if (!error)
+            {
+                on_message_received();
+                m_socket->async_read_header(&m_received_message.m_header, sizeof(Message_header<Id_type>));
+            }
+            else
+                disconnect(std::format("Read body failed because {}", error.message()), true);
         }
 
         // Starts writing message if possible otherwise does nothing
         void start_writing_message()
         {
             if (!m_out_queue.empty() && !m_is_writing_message && m_has_done_handshake)
-                async_write_header();
+            {
+                m_is_writing_message = true;
+                m_socket->async_write_header(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>));
+            }
         }
 
-        // Sends the message header over internet in async way
-        void async_write_header()
+        // Event when write header is finished
+        void async_write_header_finished(asio::error_code error, [[maybe_unused]] size_t bytes)
         {
-            m_is_writing_message = true;
+            if (!error)
+            {
+                if (m_out_queue.front().m_header.m_size > 0)
+                    m_socket->async_write_body(m_out_queue.front().m_body.data(), m_out_queue.front().m_body.size());
 
-            asio::async_write(
-                m_encrypted_socket, asio::buffer(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>)),
-                [this](asio::error_code error, [[maybe_unused]] size_t size) {
-                    if (!error)
-                    {
-                        if (m_out_queue.front().m_header.m_size > 0)
-                            async_write_body();
-                        else
-                        {
-                            m_out_queue.pop_front();
+                else
+                {
+                    m_out_queue.pop_front();
 
-                            if (!m_out_queue.empty())
-                                async_write_header();
-                            else
-                                m_is_writing_message = false;
-                        }
-                    }
+                    if (!m_out_queue.empty())
+                        m_socket->async_write_header(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>));
                     else
-                        disconnect(std::format("Write header failed because {}", error.message()), true);
-                });
+                        m_is_writing_message = false;
+                }
+            }
+            else
+                disconnect(std::format("Write header failed because {}", error.message()), true);
         }
 
-        // Sends the message body over internet in async way
-        void async_write_body()
+        // Event when writing to body is finished
+        void async_write_body_finished(asio::error_code error, [[maybe_unused]] size_t bytes)
         {
-            asio::async_write(
-                m_encrypted_socket, asio::buffer(m_out_queue.front().m_body.data(), m_out_queue.front().m_body.size()),
-                [this](asio::error_code error, [[maybe_unused]] size_t size) {
-                    if (!error)
-                    {
-                        m_out_queue.pop_front();
+            if (!error)
+            {
+                m_out_queue.pop_front();
 
-                        if (!m_out_queue.empty())
-                            async_write_header();
-                        else
-                            m_is_writing_message = false;
-                    }
-                    else
-                        disconnect(std::format("Write body failed because {}", error.message()), true);
-                });
+                if (!m_out_queue.empty())
+                    m_socket->async_write_header(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>));
+                else
+                    m_is_writing_message = false;
+            }
+            else
+                disconnect(std::format("Write body failed because {}", error.message()), true);
         }
 
         // Triggers on_message callback on current reveived_message
@@ -266,8 +256,7 @@ namespace Net
         const uint32_t m_id = 0;
         std::string m_ip = "0.0.0.0";
 
-        Encrypted_socket m_encrypted_socket;
-        const Handshake_type m_handshake_type = Handshake_type::client;
+        std::unique_ptr<Socket_interface> m_socket;
         bool m_has_done_handshake = false;
 
         bool m_is_writing_message = false;

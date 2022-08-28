@@ -13,7 +13,7 @@ namespace Net
     public:
         using Optional_seconds = std::optional<std::chrono::seconds>;
 
-        Client() : m_temp_socket(this->create_encrypted_socket())
+        Client() : m_temp_socket(this->create_socket())
         {
             this->set_ssl_verify_mode(asio::ssl::context::verify_peer);
         }
@@ -101,9 +101,9 @@ namespace Net
     private:
         void async_connect(Protocol::resolver::results_type endpoints)
         {
-            m_temp_socket = this->create_encrypted_socket();
+            m_temp_socket = this->create_socket();
             asio::async_connect(
-                m_temp_socket.lowest_layer(), endpoints,
+                m_temp_socket, endpoints,
                 [this](asio::error_code error, const Protocol::endpoint& endpoint) {
                     if (!error)
                     {
@@ -143,15 +143,15 @@ namespace Net
 
             switch (message.get_internal_id())
             {
-            case Internal_id::server_data:
-                handle_server_data(Message_converter<Id_type>::extract_server_data(message));
+            case Internal_id::server_accept:
+                handle_server_data(Message_converter<Id_type>::extract_server_accept(message));
                 break;
             default:
                 break;
             }
         }
 
-        Encrypted_socket m_temp_socket;
+        Protocol::socket m_temp_socket;
         std::unique_ptr<Connection<Id_type>> m_connection;
 
         uint32_t m_remote_id = 0;
