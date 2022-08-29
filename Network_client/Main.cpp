@@ -1,4 +1,4 @@
-#include "User/Client.h"
+#include "User/Ssl/Ssl_client.h"
 #include <iostream>
 #include <string>
 
@@ -19,7 +19,7 @@ bool send_thread_exit_flag = false;
 Net::Thread_safe_deque<Net::Message<Message_id>> messages;
 
 // Client object that handles the client networking
-Net::Client<Message_id> client;
+Net::Ssl_client<Message_id> client;
 
 // Thread for reading inputs so it will not block the client
 std::thread thread;
@@ -118,7 +118,6 @@ void start_client()
     client.m_on_connected.set_callback(on_connected);
 
     // Setup ssl stuff
-    client.enable_ssl(true);
     client.set_ssl_verify_file("server.crt");
 
     // Attempts to connect to the server

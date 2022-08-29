@@ -15,7 +15,7 @@ namespace Net
 
         Client() : m_temp_socket(this->create_socket())
         {
-            this->set_ssl_verify_mode(asio::ssl::context::verify_peer);
+            
         }
 
         ~Client() override

@@ -22,8 +22,7 @@ namespace Net
 
     // The Asio types that we currently use in this framework
     using Protocol = asio::ip::tcp;
-    using Socket = Protocol::socket;
-    using Encrypted_socket = asio::ssl::stream<Socket>;
+    using Ssl_socket = asio::ssl::stream<Protocol::socket>;
 
     // Notification severities
     enum class Severity : uint8_t

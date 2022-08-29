@@ -1,9 +1,9 @@
 #pragma once
 
 #include "../Connection/Connection.h"
-#include "../Sockets/Socket.h"
 #include "../Message/Message_converter.h"
 #include "../Message/Owned_message.h"
+#include "../Sockets/Socket.h"
 #include "../Utility/Delegate.h"
 #include "../Utility/Thread_safe_deque.h"
 #include "Asio_base.h"
@@ -73,15 +73,6 @@ namespace Net
             }
         }
 
-        /** 
-        *   Enables or disables ssl for the new connections.
-        *   All old conecttions does not change.
-        */
-        void enable_ssl(bool enabled) noexcept
-        {
-            m_use_ssl = enabled;
-        }
-
         Delegate<std::string_view, Severity> m_on_notification;
 
     protected:
@@ -122,7 +113,7 @@ namespace Net
             m_notifications.push_back(std::move(notification));
             notify_wait();
         }
-    
+
         [[nodiscard]] virtual bool should_stop_waiting()
         {
             const bool has_messages = !m_in_queue.empty();
@@ -131,7 +122,6 @@ namespace Net
             return has_messages || has_notifications;
         }
 
-      
         // Event when received new message from the connection
         void on_message_received(Owned_message<Id_type> message)
         {
@@ -149,8 +139,7 @@ namespace Net
         [[nodiscard]] std::unique_ptr<Connection<Id_type>> create_connection(
             std::unique_ptr<Socket_interface> socket, uint32_t connection_id, Handshake_type handshake_type)
         {
-            std::unique_ptr new_connection =
-                std::make_unique<Connection<Id_type>>(std::move(socket), connection_id);
+            std::unique_ptr new_connection = std::make_unique<Connection<Id_type>>(std::move(socket), connection_id);
 
             // Setups the callbacks
             new_connection->m_on_message.set_callback(
@@ -182,13 +171,9 @@ namespace Net
         };
 
         // Creates spesific socket interface for connection
-        template<typename... args>
-        [[nodiscard]] std::unique_ptr<Socket_interface> create_socket_interface(Protocol::socket socket)
+        [[nodiscard]] virtual std::unique_ptr<Socket_interface> create_socket_interface(Protocol::socket socket)
         {
-            if (m_use_ssl)
-                return std::make_unique<Template_socket<Encrypted_socket>>(create_encrypted_socket(std::move(socket)));
-            else
-                return std::make_unique<Template_socket<Protocol::socket>>(std::move(socket));
+            return std::make_unique<Template_socket<Protocol::socket>>(std::move(socket));
         }
 
         // You can spesify the max waiting time otherwise this will wait until something notifies it
@@ -238,8 +223,6 @@ namespace Net
         }
 
         virtual void check_connections(){};
-
-        bool m_use_ssl = false;
 
         std::condition_variable m_wait_condition;
         std::mutex m_wait_mutex;

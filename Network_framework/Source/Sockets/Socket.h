@@ -16,7 +16,7 @@ namespace Net
         void async_handshake(Handshake_type type) override
         {
             // Only do handshake is we have ssl socket
-            if constexpr (std::is_same_v<Asio_socket, Encrypted_socket>)
+            if constexpr (std::is_same_v<Asio_socket, Ssl_socket>)
             {
                 switch (type)
                 {

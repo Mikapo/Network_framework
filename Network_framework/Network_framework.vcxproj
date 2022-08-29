@@ -171,6 +171,10 @@
     <ClInclude Include="Source\Message\Owned_message.h" />
     <ClInclude Include="Source\Utility\Thread_safe_deque.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\User\Ssl\Ssl_client.h" />
+    <ClCompile Include="Source\User\Ssl\Ssl_server.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

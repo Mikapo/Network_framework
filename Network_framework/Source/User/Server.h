@@ -18,10 +18,6 @@ namespace Net
 
         explicit Server(uint16_t port) : m_acceptor(this->create_acceptor(Protocol::endpoint(Protocol::v4(), port)))
         {
-            this->set_ssl_password_callback(
-                [this](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
-                    return get_password(size, purpose);
-                });
         }
 
         virtual ~Server()
@@ -147,16 +143,6 @@ namespace Net
         {
             std::unique_ptr<Connection<Id_type>> m_connection = nullptr;
         };
-
-        /**
-         *   Gets ssl password
-         *   todo needs actual way to add passwords to server
-         */
-        [[nodiscard]] std::string get_password(
-            [[maybe_unused]] std::size_t size, [[maybe_unused]] asio::ssl::context_base::password_purpose purpose) const
-        {
-            return "temp password";
-        }
 
         // Triggers the on message callback for the every message
         void handle_received_messages(size_t max_messages)

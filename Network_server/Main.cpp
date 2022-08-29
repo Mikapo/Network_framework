@@ -1,4 +1,4 @@
-#include "User/Server.h"
+#include "User/Ssl/Ssl_server.h"
 #include <format>
 #include <iostream>
 #include <string>
@@ -21,7 +21,7 @@ std::unordered_map<uint32_t, std::string> names;
 constexpr uint16_t port = 1234;
 
 // the object that handles the server networking
-Net::Server<Message_id> server(port);
+Net::Ssl_server<Message_id> server(port);
 
 // Notifications from the network framework
 void server_notification(std::string_view notification, [[maybe_unused]] Net::Severity severity)
@@ -91,7 +91,6 @@ int main()
         server.m_on_message.set_callback(server_on_message);
 
         // setup ssl stuff
-        server.enable_ssl(true);
         server.set_ssl_certificate_chain_file("server.crt");
         server.set_ssl_private_key_file("server.key");
         server.set_ssl_tmp_dh_file("dh512.pem");
