@@ -57,10 +57,10 @@ namespace Net
             m_queue.erase(args...);
         }
 
-        [[nodiscard]] size_t count()
+        [[nodiscard]] size_t size()
         {
             std::scoped_lock lock(m_mutex);
-            return m_queue.count();
+            return m_queue.size();
         }
 
         void clear()

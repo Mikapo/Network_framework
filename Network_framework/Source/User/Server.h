@@ -70,6 +70,29 @@ namespace Net
             handle_new_connections(max_handled_items);
         }
 
+        // Gets information about spesific client.
+        Client_information get_client_information(uint32_t client_id) const
+        {
+            auto found_client = m_clients.find(client_id);
+
+            if (found_client == m_clients.end())
+                return {};
+
+            auto& connection_ref = found_client->second.m_connection;
+            Client_information information = { connection_ref->get_id(), connection_ref->get_ip() };
+
+            return information;
+        }
+
+        /*
+        *   Sets max allowed connections to server at same time.
+        *   This will not disconnect any already connected clients.
+        */
+        void set_max_connections(size_t new_max_connections) const noexcept
+        {
+            m_max_connections = new_max_connections;
+        }
+
         void ban_ip(const std::string& new_banned_ip)
         {
             m_banned_ip.insert(new_banned_ip);
@@ -221,13 +244,17 @@ namespace Net
                     const std::string ip = socket.remote_endpoint().address().to_string();
                     this->notifications_push_back(std::format("Server new connection: {}", ip));
 
-                    if (!m_banned_ip.contains(ip))
+                    if (m_clients.size() + m_new_connections.size() >= m_max_connections)
+                        this->notifications_push_back("Max connections reached");
+
+                    else if (m_banned_ip.contains(ip))
+                        this->notifications_push_back(std::format("Client with ip {} is banned", ip));
+
+                    else
                     {
                         m_new_connections.push_back(std::move(socket));
                         this->notify_wait();
                     }
-                    else
-                        this->notifications_push_back(std::format("Client with ip {} is banned", ip));
                 }
                 else
                     this->notifications_push_back(
@@ -281,6 +308,7 @@ namespace Net
         Protocol::acceptor m_acceptor;
         uint32_t m_id_counter = 1000;
 
+        size_t m_max_connections = std::numeric_limits<size_t>::max();
         std::unordered_set<std::string> m_banned_ip;
     };
 } // namespace Net
