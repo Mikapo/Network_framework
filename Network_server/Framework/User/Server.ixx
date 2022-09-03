@@ -1,6 +1,4 @@
-#pragma once
-
-#include "User.h"
+module;
 #include <cstdint>
 #include <format>
 #include <limits>
@@ -8,7 +6,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace Net
+export module Network_framework:Server;
+import :User; 
+
+export namespace Net
 {
     template <Id_concept Id_type>
     class Server : public User<Id_type>
@@ -79,15 +80,15 @@ namespace Net
                 return {};
 
             auto& connection_ref = found_client->second.m_connection;
-            Client_information information = { connection_ref->get_id(), connection_ref->get_ip() };
+            Client_information information = {connection_ref->get_id(), connection_ref->get_ip()};
 
             return information;
         }
 
         /*
-        *   Sets max allowed connections to server at same time.
-        *   This will not disconnect any already connected clients.
-        */
+         *   Sets max allowed connections to server at same time.
+         *   This will not disconnect any already connected clients.
+         */
         void set_max_connections(size_t new_max_connections) const noexcept
         {
             m_max_connections = new_max_connections;

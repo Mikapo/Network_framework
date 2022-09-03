@@ -1,11 +1,16 @@
-#pragma once
-
-#include "../Utility/Thread_safe_deque.h"
-#include "User.h"
+module;
+#include "../Utility/Asio_includes.h"
 #include <cstdint>
 #include <memory>
+#include <chrono>
+#include <optional>
 
-namespace Net
+export module Network_framework:Client;
+import :Thread_safe_deque;
+import :User;
+import :Message_converter;
+
+export namespace Net
 {
     template <Id_concept Id_type>
     class Client : public User<Id_type>
@@ -15,7 +20,6 @@ namespace Net
 
         Client() : m_temp_socket(this->create_socket())
         {
-            
         }
 
         ~Client() override
@@ -103,8 +107,7 @@ namespace Net
         {
             m_temp_socket = this->create_socket();
             asio::async_connect(
-                m_temp_socket, endpoints,
-                [this](asio::error_code error, const Protocol::endpoint& endpoint) {
+                m_temp_socket, endpoints, [this](asio::error_code error, const Protocol::endpoint& endpoint) {
                     if (!error)
                     {
                         m_connection = this->create_connection(std::move(m_temp_socket), 0, Handshake_type::client);

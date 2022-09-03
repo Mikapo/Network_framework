@@ -1,9 +1,13 @@
-#pragma once
+module;
+#include "../Utility/Asio_includes.h"
+#include <cstdint>
+#include <string>
 
-#include "../Utility/Common.h"
-#include "../Utility/Delegate.h"
+export module Network_framework:Socket_interface;
+import :Common;
+import :Delegate;
 
-namespace Net
+export namespace Net
 {
     enum class Handshake_type : uint8_t
     {

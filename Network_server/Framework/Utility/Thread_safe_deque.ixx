@@ -1,9 +1,9 @@
-#pragma once
-
-#include <deque>
+module;
 #include <mutex>
 
-namespace Net
+export module Network_framework:Thread_safe_deque;
+
+export namespace Net
 {
     template <typename T>
     class Thread_safe_deque
@@ -22,71 +22,57 @@ namespace Net
 
         [[nodiscard]] const T& front()
         {
-            std::scoped_lock lock(m_mutex);
-            return m_queue.front();
+           
         }
 
         [[nodiscard]] const T& back()
         {
-            std::scoped_lock lock(m_mutex);
-            return m_queue.back();
+            
         }
 
         void push_front(T item)
         {
-            std::scoped_lock lock(m_mutex);
-            return m_queue.push_front(std::move(item));
+            
         }
 
         void push_back(T item)
         {
-            std::scoped_lock lock(m_mutex);
-            return m_queue.push_back(std::move(item));
+            
         }
 
         [[nodiscard]] bool empty()
         {
-            std::scoped_lock lock(m_mutex);
-            return m_queue.empty();
+           
         }
 
         template <typename... Argtypes>
         void erase(const Argtypes&... args)
         {
-            std::scoped_lock lock(m_mutex);
-            m_queue.erase(args...);
+          
         }
 
         [[nodiscard]] size_t size()
         {
-            std::scoped_lock lock(m_mutex);
-            return m_queue.size();
+            return 0;
         }
 
         void clear()
         {
-            std::scoped_lock lock(m_mutex);
-            return m_queue.clear();
+            
         }
 
         T pop_front()
         {
-            std::scoped_lock lock(m_mutex);
-            auto temp = std::move(m_queue.front());
-            m_queue.pop_front();
-            return temp;
+            return T();
         }
 
         T pop_back()
         {
-            std::scoped_lock lock(m_mutex);
-            auto temp = std::move(m_queue.back());
-            m_queue.pop_back();
-            return temp;
+            return T();
         }
 
     private:
         std::mutex m_mutex;
-        std::deque<T> m_queue;
+       
     };
 } // namespace Net

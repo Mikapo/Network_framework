@@ -1,6 +1,9 @@
-#include "../Server.h"
+export module Network_framework:Ssl_server;
 
-namespace Net
+import :Server;
+import :Common;
+
+export namespace Net
 {
     template <Id_concept Id_type>
     class Ssl_server : public Server<Id_type>

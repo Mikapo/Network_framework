@@ -115,7 +115,10 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)Libraries\OpenSSL-Win64\include;$(SolutionDir)Libraries\asio-1.22.2\include;$(SolutionDir)Network_framework\Source;$(SolutionDir)Network_framework\Vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalModuleDependencies>
+      </AdditionalModuleDependencies>
+      <EnableModules>true</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,7 +136,10 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)Libraries\OpenSSL-Win64\include;$(SolutionDir)Libraries\asio-1.22.2\include;$(SolutionDir)Network_framework\Source;$(SolutionDir)Network_framework\Vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalModuleDependencies>
+      </AdditionalModuleDependencies>
+      <EnableModules>true</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -145,7 +151,28 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Framework\Connection\Connection.ixx" />
+    <ClCompile Include="Framework\Message\Message.ixx" />
+    <ClCompile Include="Framework\Message\Message_converter.ixx" />
+    <ClCompile Include="Framework\Message\Message_header.ixx" />
+    <ClCompile Include="Framework\Message\Owned_message.ixx" />
+    <ClCompile Include="Framework\Network_framework.ixx" />
+    <ClCompile Include="Framework\Sockets\Socket_interface.ixx" />
+    <ClCompile Include="Framework\Sockets\Template_socket.ixx" />
+    <ClCompile Include="Framework\User\Asio_base.ixx" />
+    <ClCompile Include="Framework\User\Client.ixx" />
+    <ClCompile Include="Framework\User\Server.ixx" />
+    <ClCompile Include="Framework\User\Ssl\Ssl_client.ixx" />
+    <ClCompile Include="Framework\User\Ssl\Ssl_server.ixx" />
+    <ClCompile Include="Framework\User\User.ixx" />
+    <ClCompile Include="Framework\Utility\Client_information.ixx" />
+    <ClCompile Include="Framework\Utility\Common.ixx" />
+    <ClCompile Include="Framework\Utility\Delegate.ixx" />
+    <ClCompile Include="Framework\Utility\Thread_safe_deque.ixx" />
     <ClCompile Include="Main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Framework\Utility\Asio_includes.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

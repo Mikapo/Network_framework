@@ -325,7 +325,7 @@
 #endif // !defined(ASIO_HAS_NOEXCEPT)
 #if !defined(ASIO_NOEXCEPT)
 # if defined(ASIO_HAS_NOEXCEPT)
-#  define ASIO_NOEXCEPT noexcept(true)
+#  define ASIO_NOEXCEPT noexcept
 # else // defined(ASIO_HAS_NOEXCEPT)
 #  define ASIO_NOEXCEPT
 # endif // defined(ASIO_HAS_NOEXCEPT)

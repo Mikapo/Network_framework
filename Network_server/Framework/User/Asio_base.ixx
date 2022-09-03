@@ -1,6 +1,8 @@
-#pragma once
+module;
+#include "../Utility/Asio_includes.h"
 
-#include "../Utility/Common.h"
+export module Network_framework:Asio_base;
+import :Common;
 
 namespace Net
 {

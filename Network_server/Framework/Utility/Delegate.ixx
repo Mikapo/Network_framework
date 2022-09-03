@@ -1,8 +1,9 @@
-#pragma once
-
+module;
 #include <functional>
 
-namespace Net
+export module Network_framework:Delegate;
+
+export namespace Net
 {
     // The class that handles callbacks
     template <typename... Parameter_types>
@@ -10,10 +11,10 @@ namespace Net
     {
     public:
         /**
-        *   Sets the callable that gets called when this delegate is broadcasted
-        * 
-        *   @param any callable with correct parameter types and void return type
-        */
+         *   Sets the callable that gets called when this delegate is broadcasted
+         *
+         *   @param any callable with correct parameter types and void return type
+         */
         template <typename Callable_type>
         void set_callback(Callable_type callable)
         {
@@ -26,11 +27,11 @@ namespace Net
         }
 
         /**
-        *   Triggers the callback set on this delegate
-        * 
-        *   @param the parameters to forward into the callback
-        *   @return has callback been set for this delegate
-        */
+         *   Triggers the callback set on this delegate
+         *
+         *   @param the parameters to forward into the callback
+         *   @return has callback been set for this delegate
+         */
         bool broadcast(Parameter_types... parameters) const
         {
             if (!has_been_set())

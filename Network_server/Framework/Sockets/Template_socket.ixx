@@ -1,11 +1,14 @@
-#pragma once
+module;
+#include "../Utility/Asio_includes.h"
+#include <cstdint>
+#include <string>
 
-#include "Socket_interface.h"
-#include <type_traits>
+export module Network_framework:Template_socket;
+import :Socket_interface;
 
-namespace Net
+export namespace Net
 {
-    template<typename Asio_socket>
+    template <typename Asio_socket>
     class Template_socket : public Socket_interface
     {
     public:
@@ -35,7 +38,6 @@ namespace Net
             }
             else
                 m_handshake_finished.broadcast(asio::error_code());
-
         }
 
         void async_read_header(void* buffer, size_t size) override

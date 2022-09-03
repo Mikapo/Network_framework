@@ -1,18 +1,18 @@
-#pragma once
-
-#include "../Connection/Connection.h"
-#include "../Message/Message_converter.h"
-#include "../Message/Owned_message.h"
-#include "../Sockets/Socket.h"
-#include "../Utility/Delegate.h"
-#include "../Utility/Thread_safe_deque.h"
-#include "Asio_base.h"
+module;
 #include <chrono>
 #include <concepts>
 #include <optional>
 #include <thread>
 
-namespace Net
+export module Network_framework:User;
+import :Connection;
+import :Owned_message;
+import :Template_socket;
+import :Delegate;
+import :Thread_safe_deque;
+import :Asio_base;
+
+export namespace Net
 {
     // Base class for the server and the client
     template <Id_concept Id_type>

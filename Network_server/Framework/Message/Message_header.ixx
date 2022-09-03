@@ -1,9 +1,10 @@
-#pragma once
-
+module;
 #include <cstdint>
 #include <type_traits>
 
-namespace Net
+export module Network_framework:Message_header;
+
+export namespace Net
 {
     // Used to handle messages that are internat to framework
     enum class Internal_id : uint8_t
@@ -48,4 +49,3 @@ namespace Net
         }
     };
 }
-

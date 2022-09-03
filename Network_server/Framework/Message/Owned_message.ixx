@@ -1,9 +1,12 @@
-#pragma once
+module;
+#include <utility>
+#include <ostream>
 
-#include "../Utility/Client_information.h"
-#include "Message.h"
+export module Network_framework:Owned_message;
+import :Client_information;
+import :Message;
 
-namespace Net
+export namespace Net
 {
     // Message + information about the sender of the message
     template <Id_concept Id_type>

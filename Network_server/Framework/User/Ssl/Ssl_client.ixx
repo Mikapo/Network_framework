@@ -1,6 +1,8 @@
-#include "../Client.h"
+export module Network_framework:Ssl_client;
 
-namespace Net
+import :Client;
+
+export namespace Net
 {
     template <Id_concept Id_type>
     class Ssl_client : public Client<Id_type>

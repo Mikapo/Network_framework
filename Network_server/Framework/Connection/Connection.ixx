@@ -1,14 +1,16 @@
-#pragma once
-
-#include "../Message/Owned_message.h"
-#include "../Sockets/Socket_interface.h"
-#include "../Utility/Common.h"
-#include "../Utility/Delegate.h"
-#include "../Utility/Thread_safe_deque.h"
-#include <memory>
+module;
+#include <format>
 #include <unordered_map>
 
-namespace Net
+export module Network_framework:Connection;
+import :Owned_message;
+import :Socket_interface;
+import :Common;
+import :Delegate;
+import :Thread_safe_deque; 
+
+
+export namespace Net
 {
     struct Message_limits
     {
@@ -26,7 +28,6 @@ namespace Net
         Connection(std::unique_ptr<Socket_interface> socket, uint32_t connection_id)
             : m_id(connection_id), m_socket(std::move(socket))
         {
-           
         }
 
         Connection(const Connection&) = delete;
@@ -92,20 +93,20 @@ namespace Net
     private:
         void setup_callbacks_on_socket() noexcept
         {
-            m_socket->m_handshake_finished.set_callback([this](asio::error_code error){
-                async_handshake_finished(error);});
+            m_socket->m_handshake_finished.set_callback(
+                [this](asio::error_code error) { async_handshake_finished(error); });
 
-                m_socket->m_read_header_finished.set_callback([this](asio::error_code error, size_t bytes){
-                async_read_header_finished(error, bytes);});
+            m_socket->m_read_header_finished.set_callback(
+                [this](asio::error_code error, size_t bytes) { async_read_header_finished(error, bytes); });
 
-                m_socket->m_read_body_finished.set_callback([this](asio::error_code error, size_t bytes){
-                async_read_body_finished(error, bytes);});
+            m_socket->m_read_body_finished.set_callback(
+                [this](asio::error_code error, size_t bytes) { async_read_body_finished(error, bytes); });
 
-                m_socket->m_write_header_finished.set_callback([this](asio::error_code error, size_t bytes){
-                async_write_header_finished(error, bytes);});
+            m_socket->m_write_header_finished.set_callback(
+                [this](asio::error_code error, size_t bytes) { async_write_header_finished(error, bytes); });
 
-                 m_socket->m_write_body_finished.set_callback([this](asio::error_code error, size_t bytes){
-                async_write_body_finished(error, bytes);});
+            m_socket->m_write_body_finished.set_callback(
+                [this](asio::error_code error, size_t bytes) { async_write_body_finished(error, bytes); });
         }
 
         // Updates m_ip member with the current remote ip
@@ -265,3 +266,4 @@ namespace Net
         Accepted_messages_ptr m_accepted_messages = nullptr;
     };
 } // namespace Net
+

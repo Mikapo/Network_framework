@@ -1,21 +1,20 @@
-#pragma once
-
-#include "../Utility/Common.h"
-#include "Message_header.h"
-#include <ostream>
-#include <span>
+module;
 #include <stdexcept>
+#include <ostream>
 #include <string_view>
 #include <type_traits>
 #include <vector>
 
-namespace Net
+export module Network_framework:Message;
+export import :Message_header;
+
+export namespace Net
 {
     // This concept decides what kind of data the message accepts
     template <typename T>
     concept Message_data_concept = std::is_standard_layout_v<T>;
 
-    template<Id_concept Id_type>
+    template <Id_concept Id_type>
     class Connection;
 
     // This class is used to store messages that are sent over internet
@@ -37,12 +36,12 @@ namespace Net
             return stream;
         }
 
-        /** 
-        *   Push data to the end of the message
-        * 
-        *   @param data to be pushed
-        *   @throws if the size of data is larger than the max value that the Header_size_type can hold
-        */
+        /**
+         *   Push data to the end of the message
+         *
+         *   @param data to be pushed
+         *   @throws if the size of data is larger than the max value that the Header_size_type can hold
+         */
         template <Message_data_concept Data_type>
         void push_back(const Data_type& data)
         {
@@ -54,18 +53,18 @@ namespace Net
 
             resize_body(new_size);
 
-            // Copying the data to the end of the body 
+            // Copying the data to the end of the body
             std::memcpy(&m_body.at(size), &data, sizeof(Data_type));
 
             m_header.m_size = checked_cast<Header_size_type>(m_body.size());
         }
 
         /**
-        *   Extract data from the end of the message
-        *   
-        *   @return the data that was extracted
-        *   @throws if there is not enough data to be extracted
-        */
+         *   Extract data from the end of the message
+         *
+         *   @return the data that was extracted
+         *   @throws if there is not enough data to be extracted
+         */
         template <Message_data_concept Data_type>
         Data_type extract()
         {
@@ -100,7 +99,6 @@ namespace Net
             return output;
         }
 
-
         // Operator << for pushing data
         template <Message_data_concept Data_type>
         friend Message& operator<<(Message& message, const Data_type& data)
@@ -127,10 +125,10 @@ namespace Net
             return !(*this == other);
         }
 
-        /** 
-        *   Sets internal id of the message.
-        *   This should never be called outside the framework.
-        */
+        /**
+         *   Sets internal id of the message.
+         *   This should never be called outside the framework.
+         */
         void set_internal_id(Internal_id new_internal_id) noexcept
         {
             m_header.m_internal_id = new_internal_id;
@@ -177,10 +175,10 @@ namespace Net
         }
 
         /**
-        *   @param begin iterator
-        *   @param end iterator
-        *   @throws if tries to extract too much data
-        */
+         *   @param begin iterator
+         *   @param end iterator
+         *   @throws if tries to extract too much data
+         */
         template <typename Iterator_type>
         void extract_to_container(Iterator_type begin, Iterator_type end)
         {
