@@ -32,13 +32,13 @@ void server_notification(std::string_view notification, [[maybe_unused]] Net::Se
 // Setups name for the client and sends back accepted string
 void on_set_name(uint32_t client_id, Net::Message<Message_id> message)
 {
-    const std::string name = message.extract_as_string();
+    const std::string name = message.extract<std::string>();
     names[client_id] = name;
 
     const std::string respond = "Name accepted";
     Net::Message<Message_id> net_message;
     net_message.set_id(Message_id::server_message);
-    net_message.push_back_string(respond);
+    net_message << respond;
 
     server.send_message_to_client(client_id, net_message);
 
@@ -50,12 +50,12 @@ void on_chat_message(uint32_t client_id, Net::Message<Message_id> message)
 {
     const auto found_name = names.find(client_id);
 
-    const std::string chat_message = message.extract_as_string();
+    const std::string chat_message = message.extract<std::string>();
     const std::string formated_message = std::format("[{}] {}", found_name->second, chat_message);
 
     Net::Message<Message_id> net_message;
     net_message.set_id(Message_id::server_message);
-    net_message.push_back_string(formated_message);
+    net_message << formated_message;
 
     server.send_message_to_all_clients(net_message);
 

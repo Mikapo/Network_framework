@@ -36,7 +36,7 @@ void client_on_message(Net::Message<Message_id> message)
     switch (message.get_id())
     {
     case Message_id::server_message: {
-        const std::string chat_message = message.extract_as_string();
+        const std::string chat_message = message.extract<std::string>();
         std::cout << chat_message << "\n";
         break;
     }
@@ -55,7 +55,7 @@ void send_name()
 
     Net::Message<Message_id> message;
     message.set_id(Message_id::client_set_name);
-    message.push_back_string(username);
+    message << username;
 
     client.send_message(message);
 }
@@ -75,7 +75,7 @@ void send_thread()
 
         Net::Message<Message_id> net_message;
         net_message.set_id(Message_id::client_message);
-        net_message.push_back_string(message);
+        net_message << message;
 
         messages.push_back(net_message);
     }

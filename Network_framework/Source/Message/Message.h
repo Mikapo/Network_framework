@@ -37,26 +37,56 @@ namespace Net
             return stream;
         }
 
+        // Copies buffer to the end of the message
+        void push_back_buffer(const void* buffer, size_t buffer_size)
+        {
+            const size_t size = m_body.size();
+            const size_t new_size = size + buffer_size;
+
+             if (new_size > std::numeric_limits<Header_size_type>::max())
+                throw std::length_error("storing too much data to message");
+
+            resize_body(new_size);
+
+            // Copying the data to the end of the body
+            std::memcpy(&m_body.at(size), buffer, buffer_size);
+
+            m_header.m_size = checked_cast<Header_size_type>(m_body.size());
+        }
+
         /** 
         *   Push data to the end of the message
         * 
         *   @param data to be pushed
         *   @throws if the size of data is larger than the max value that the Header_size_type can hold
         */
-        template <Message_data_concept Data_type>
+        template <typename Data_type>
         void push_back(const Data_type& data)
         {
-            const size_t size = m_body.size();
-            const size_t new_size = size + sizeof(Data_type);
+            if constexpr (std::is_standard_layout_v<Data_type>)
+                push_back_buffer(&data, sizeof(data));
+            else
+                push_back_special<Data_type>(data);
+        }
 
-            if (new_size > std::numeric_limits<Header_size_type>::max())
-                throw std::length_error("storing too much data to message");
+        template<typename... Data_types>
+        void push_back_multiple(const Data_types&... data)
+        {
+            ((push_back(data)), ...);
+        }
+
+        // Extract to the buffer from the end of the message
+        void extract_to_buffer(void* buffer, size_t buffer_size)
+        {
+            if (buffer_size > m_body.size())
+                throw std::length_error("not enough data to extract");
+
+            const size_t new_size = m_body.size() - buffer_size;
+
+            // Copying to the buffer from the end of the body
+            std::memcpy(buffer, &m_body.at(new_size), buffer_size);
 
             resize_body(new_size);
-
-            // Copying the data to the end of the body 
-            std::memcpy(&m_body.at(size), &data, sizeof(Data_type));
-
             m_header.m_size = checked_cast<Header_size_type>(m_body.size());
         }
 
@@ -66,43 +96,32 @@ namespace Net
         *   @return the data that was extracted
         *   @throws if there is not enough data to be extracted
         */
-        template <Message_data_concept Data_type>
+        template <typename Data_type>
         Data_type extract()
         {
-            if (sizeof(Data_type) > m_body.size())
-                throw std::length_error("not enough data to extract");
-
-            const size_t new_size = m_body.size() - sizeof(Data_type);
-
-            // Copyign to the data from the end of the body
-            Data_type data;
-            std::memcpy(&data, &m_body.at(new_size), sizeof(Data_type));
-
-            resize_body(new_size);
-            m_header.m_size = checked_cast<Header_size_type>(m_body.size());
-
-            return data;
+            if constexpr (std::is_standard_layout_v<Data_type>)
+            {
+                Data_type data;
+                extract_to_buffer(&data, sizeof(Data_type));
+                return data;
+            }
+            else
+                return extract_special<Data_type>();
         }
 
-        // Pushes a string and the size of the string after the string
-        void push_back_string(std::string_view string)
+        /**  
+        *  Allows you to pass multiple variables and they will be extracted in order
+        * 
+        *  @param variables where to extract
+        */
+        template<typename... Data_types>
+        void extract_multiple(Data_types&... data)
         {
-            push_back_from_container(string.begin(), string.end());
-            push_back(checked_cast<Size_type>(string.size()));
+            ((data = extract<Data_type>()), ...);
         }
-
-        // Expects the size of the string at top of the message
-        std::string extract_as_string()
-        {
-            std::string output;
-            output.resize(extract<Size_type>());
-            extract_to_container(output.rbegin(), output.rend());
-            return output;
-        }
-
 
         // Operator << for pushing data
-        template <Message_data_concept Data_type>
+        template <typename Data_type>
         friend Message& operator<<(Message& message, const Data_type& data)
         {
             message.push_back<Data_type>(data);
@@ -110,7 +129,7 @@ namespace Net
         }
 
         // Operator >> for extracting data
-        template <Message_data_concept Data_type>
+        template <typename Data_type>
         friend Message& operator>>(Message& message, Data_type& data)
         {
             data = message.extract<Data_type>();
@@ -164,30 +183,33 @@ namespace Net
         }
 
     private:
-        /**
-         *  @param begin iterator
-         *  @param end iterator
-         *  @throws if tries to push back too much data
-         */
-        template <typename Iterator_type>
-        void push_back_from_container(Iterator_type begin, Iterator_type end)
+        template<typename Container>
+        void push_back_special(const Container& container)
         {
-            for (; begin != end; ++begin)
-                push_back(*begin);
+            throw std::logic_error("No spesialization");
         }
 
-        /**
-        *   @param begin iterator
-        *   @param end iterator
-        *   @throws if tries to extract too much data
-        */
-        template <typename Iterator_type>
-        void extract_to_container(Iterator_type begin, Iterator_type end)
+        // Pushes a string and the size of the string after the string
+        template<>
+        void push_back_special<std::string>(const std::string& string)
         {
-            using Type = std::iterator_traits<Iterator_type>::value_type;
+            push_back_buffer(string.data(), string.size());
+            push_back(checked_cast<Size_type>(string.size()));
+        }
 
-            for (; begin != end; ++begin)
-                *begin = extract<Type>();
+        template <typename Container>
+        std::string extract_special()
+        {
+            throw std::logic_error("No spesialization");
+        }
+
+        template <>
+        std::string extract_special<std::string>()
+        {
+            std::string output;
+            output.resize(extract<Size_type>());
+            extract_to_buffer(output.data(), output.size());
+            return output;
         }
 
         void resize_body(size_t new_size)
@@ -197,9 +219,9 @@ namespace Net
 
         // Simple integral cast with check that the value has not changes after cast
         template <std::integral Cast_to, std::integral Cast_from>
-        static Cast_to checked_cast(const Cast_from& value)
+        static Cast_to checked_cast(Cast_from value)
         {
-            const Cast_to casted_value = static_cast<Cast_to>(value);
+            Cast_to casted_value = static_cast<Cast_to>(value);
 
             if (value != casted_value)
                 throw std::length_error("Value changed when casted");
