@@ -21,10 +21,9 @@ namespace Net
 
     // The message header is for identifying what type of message has been received
     template <Id_concept Id_type>
-    struct Message_header
+    class Message_header
     {
-        constexpr static uint64_t CONSTANT_VALIDATION_KEY = 9970951313928774000;
-
+    public:
         // Key used to validate the message
         uint64_t m_validation_key = CONSTANT_VALIDATION_KEY;
 
@@ -37,6 +36,11 @@ namespace Net
         // Size of the message
         Header_size_type m_size = 0;
 
+        [[nodiscard]] bool is_validation_key_correct() const noexcept
+        {
+            return m_validation_key == CONSTANT_VALIDATION_KEY;
+        }
+
         bool operator==(const Message_header& other) const noexcept
         {
             return m_id == other.m_id && m_size == other.m_size;
@@ -46,6 +50,8 @@ namespace Net
         {
             return !(*this == other);
         }
-    };
-}
 
+    private:
+        constexpr static uint64_t CONSTANT_VALIDATION_KEY = 9970951313928774000ull;
+    };
+} // namespace Net

@@ -1,12 +1,14 @@
 #include "../Client.h"
 
+
+
 namespace Net
 {
     template <Id_concept Id_type>
     class Ssl_client : public Client<Id_type>
     {
     public:
-        Ssl_client() : m_ssl_context(asio::ssl::context_base::sslv23)
+        Ssl_client() noexcept : m_ssl_context(asio::ssl::context_base::sslv23)
         {
             m_ssl_context.set_verify_mode(asio::ssl::context_base::verify_peer);
         }

@@ -5,19 +5,13 @@
 #include <ostream>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <vector>
 
 namespace Net
 {
-    // This concept decides what kind of data the message accepts
-    template <typename T>
-    concept Message_data_concept = std::is_standard_layout_v<T>;
-
-    template<Id_concept Id_type>
-    class Connection;
-
     // This class is used to store messages that are sent over internet
     template <Id_concept Id_type>
     class Message
@@ -25,9 +19,6 @@ namespace Net
     public:
         // Type used to store container sizes in the message body
         using Size_type = uint64_t;
-
-        // Marking connection as friend so it has full access to the body and the header
-        friend Connection<Id_type>;
 
         // Print operator
         friend std::ostream& operator<<(std::ostream& stream, const Message& message)
@@ -43,8 +34,8 @@ namespace Net
             const size_t size = m_body.size();
             const size_t new_size = size + buffer_size;
 
-             if (new_size > std::numeric_limits<Header_size_type>::max())
-                throw std::length_error("storing too much data to message");
+            if (new_size > std::numeric_limits<Header_size_type>::max())
+                throw std::length_error("Storing too much data to message");
 
             resize_body(new_size);
 
@@ -54,32 +45,37 @@ namespace Net
             m_header.m_size = checked_cast<Header_size_type>(m_body.size());
         }
 
-        /** 
-        *   Push data to the end of the message
-        * 
-        *   @param data to be pushed
-        *   @throws if the size of data is larger than the max value that the Header_size_type can hold
-        */
+        /**
+         *   Push data to the end of the message
+         *
+         *   @param data to be pushed
+         *   @throws if the size of data is larger than the max value that the Header_size_type can hold
+         */
         template <typename Data_type>
         void push_back(const Data_type& data)
         {
-            if constexpr (std::is_standard_layout_v<Data_type>)
-                push_back_buffer(&data, sizeof(data));
-            else
-                push_back_special<Data_type>(data);
+            static_assert(std::is_standard_layout_v<Data_type>);
+            push_back_buffer(&data, sizeof(data));
         }
 
-        template<typename... Data_types>
-        void push_back_multiple(const Data_types&... data)
+        template <>
+        void push_back<std::string_view>(const std::string_view& string)
         {
-            ((push_back(data)), ...);
+            push_back_buffer(string.data(), string.size());
+            push_back(static_cast<Size_type>(string.size()));
+        }
+
+        template <>
+        void push_back<std::string>(const std::string& string)
+        {
+            push_back<std::string_view>(string);
         }
 
         // Extract to the buffer from the end of the message
         void extract_to_buffer(void* buffer, size_t buffer_size)
         {
             if (buffer_size > m_body.size())
-                throw std::length_error("not enough data to extract");
+                throw std::length_error("Not enough data to extract");
 
             const size_t new_size = m_body.size() - buffer_size;
 
@@ -91,33 +87,29 @@ namespace Net
         }
 
         /**
-        *   Extract data from the end of the message
-        *   
-        *   @return the data that was extracted
-        *   @throws if there is not enough data to be extracted
-        */
+         *   Extract data from the end of the message
+         *
+         *   @return the data that was extracted
+         *   @throws if there is not enough data to be extracted
+         */
         template <typename Data_type>
         Data_type extract()
         {
-            if constexpr (std::is_standard_layout_v<Data_type>)
-            {
-                Data_type data;
-                extract_to_buffer(&data, sizeof(Data_type));
-                return data;
-            }
-            else
-                return extract_special<Data_type>();
+            static_assert(std::is_standard_layout_v<Data_type>);
+
+            constexpr static size_t data_size = sizeof(Data_type);
+            std::array<char, data_size> buffer;
+            extract_to_buffer(buffer.data(), data_size);
+            return *reinterpret_cast<Data_type*>(buffer.data());
         }
 
-        /**  
-        *  Allows you to pass multiple variables and they will be extracted in order
-        * 
-        *  @param variables where to extract
-        */
-        template<typename... Data_types>
-        void extract_multiple(Data_types&... data)
+        template <>
+        std::string extract<std::string>()
         {
-            ((data = extract<Data_type>()), ...);
+            std::string output;
+            output.resize(extract<Size_type>());
+            extract_to_buffer(output.data(), output.size());
+            return output;
         }
 
         // Operator << for pushing data
@@ -146,10 +138,10 @@ namespace Net
             return !(*this == other);
         }
 
-        /** 
-        *   Sets internal id of the message.
-        *   This should never be called outside the framework.
-        */
+        /**
+         *   Sets internal id of the message.
+         *   This should never be called outside the framework.
+         */
         void set_internal_id(Internal_id new_internal_id) noexcept
         {
             m_header.m_internal_id = new_internal_id;
@@ -182,34 +174,29 @@ namespace Net
             return m_body.empty();
         }
 
-    private:
-        template<typename Container>
-        void push_back_special(const Container& container)
+        [[nodiscard]] const Message_header<Id_type>& get_header() const noexcept
         {
-            throw std::logic_error("No spesialization");
+            return m_header;
         }
 
-        // Pushes a string and the size of the string after the string
-        template<>
-        void push_back_special<std::string>(const std::string& string)
+        [[nodiscard]] size_t header_size() const noexcept
         {
-            push_back_buffer(string.data(), string.size());
-            push_back(checked_cast<Size_type>(string.size()));
+            return sizeof(Message_header<Id_type>);
         }
 
-        template <typename Container>
-        std::string extract_special()
+        [[nodiscard]] auto* header_data(this auto& self) noexcept
         {
-            throw std::logic_error("No spesialization");
+            return &self.m_header;
         }
 
-        template <>
-        std::string extract_special<std::string>()
+        [[nodiscard]] size_t body_size() const noexcept
         {
-            std::string output;
-            output.resize(extract<Size_type>());
-            extract_to_buffer(output.data(), output.size());
-            return output;
+            return m_body.size();
+        }
+
+        [[nodiscard]] auto* body_data(this auto& self) noexcept
+        {
+            return self.m_body.data();
         }
 
         void resize_body(size_t new_size)
@@ -217,6 +204,7 @@ namespace Net
             m_body.resize(new_size);
         }
 
+    private:
         // Simple integral cast with check that the value has not changes after cast
         template <std::integral Cast_to, std::integral Cast_from>
         static Cast_to checked_cast(Cast_from value)

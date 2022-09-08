@@ -4,7 +4,7 @@
 #include "../Message/Message_converter.h"
 #include "../Message/Owned_message.h"
 #include "../Sockets/Socket.h"
-#include "../Utility/Delegate.h"
+#include "../Events/Delegate.h"
 #include "../Utility/Thread_safe_deque.h"
 #include "Asio_base.h"
 #include <chrono>
@@ -142,11 +142,8 @@ namespace Net
             std::unique_ptr new_connection = std::make_unique<Connection<Id_type>>(std::move(socket), connection_id);
 
             // Setups the callbacks
-            new_connection->m_on_message.set_callback(
-                [this](Owned_message<Id_type> message) { on_message_received(std::move(message)); });
-
-            new_connection->m_on_notification.set_callback(
-                [this](const std::string& message, Severity severity) { notifications_push_back(message, severity); });
+            new_connection->m_on_message.set_callback(this, &User<Id_type>::on_message_received);
+            new_connection->m_on_notification.set_callback(this, &User<Id_type>::notifications_push_back);
 
             // Gives shared pointer of the accepted messages to the connection
             new_connection->set_accepted_messages(m_accepted_messages);

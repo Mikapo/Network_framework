@@ -6,6 +6,8 @@ namespace Net
     class Ssl_server : public Server<Id_type>
     {
     public:
+         using Ssl_socket = asio::ssl::stream<Protocol::socket>;
+
         Ssl_server(uint16_t port) : Server<Id_type>(port), m_ssl_context(asio::ssl::context::sslv23)
         {
             m_ssl_context.set_password_callback(

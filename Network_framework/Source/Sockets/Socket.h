@@ -1,15 +1,16 @@
 #pragma once
 
+#include "../Utility/Common.h"
 #include "Socket_interface.h"
 #include <type_traits>
 
 namespace Net
 {
-    template<typename Asio_socket>
+    template <typename Asio_socket>
     class Template_socket : public Socket_interface
     {
     public:
-        Template_socket(Asio_socket socket) : m_socket(std::move(socket))
+        Template_socket(Asio_socket socket) noexcept : m_socket(std::move(socket))
         {
         }
 
@@ -35,7 +36,6 @@ namespace Net
             }
             else
                 m_handshake_finished.broadcast(asio::error_code());
-
         }
 
         void async_read_header(void* buffer, size_t size) override
@@ -75,7 +75,7 @@ namespace Net
             }
         }
 
-        bool is_open() const noexcept override
+        bool is_open() const override
         {
             return m_socket.lowest_layer().is_open();
         }

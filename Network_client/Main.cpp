@@ -142,15 +142,8 @@ void start_client()
 
 int main()
 {
-    try
-    {
-        start_client();
-    }
-    catch (const std::exception& exception)
-    {
-        std::cout << "Exception: " << exception.what() << "\n";
-    }
-
+    start_client();
+  
     std::cout << "Press enter to exit... \n";
     std::cin.get();
 }

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "../Events/Delegate.h"
 #include "../Message/Owned_message.h"
 #include "../Sockets/Socket_interface.h"
 #include "../Utility/Common.h"
-#include "../Utility/Delegate.h"
 #include "../Utility/Thread_safe_deque.h"
 #include <memory>
 #include <unordered_map>
@@ -26,7 +26,6 @@ namespace Net
         Connection(std::unique_ptr<Socket_interface> socket, uint32_t connection_id)
             : m_id(connection_id), m_socket(std::move(socket))
         {
-           
         }
 
         Connection(const Connection&) = delete;
@@ -90,22 +89,13 @@ namespace Net
         Delegate<Owned_message<Id_type>> m_on_message;
 
     private:
-        void setup_callbacks_on_socket() noexcept
+        void setup_callbacks_on_socket()
         {
-            m_socket->m_handshake_finished.set_callback([this](asio::error_code error){
-                async_handshake_finished(error);});
-
-                m_socket->m_read_header_finished.set_callback([this](asio::error_code error, size_t bytes){
-                async_read_header_finished(error, bytes);});
-
-                m_socket->m_read_body_finished.set_callback([this](asio::error_code error, size_t bytes){
-                async_read_body_finished(error, bytes);});
-
-                m_socket->m_write_header_finished.set_callback([this](asio::error_code error, size_t bytes){
-                async_write_header_finished(error, bytes);});
-
-                 m_socket->m_write_body_finished.set_callback([this](asio::error_code error, size_t bytes){
-                async_write_body_finished(error, bytes);});
+            m_socket->m_handshake_finished.set_callback(this, &Connection<Id_type>::async_handshake_finished);
+            m_socket->m_read_header_finished.set_callback(this, &Connection<Id_type>::async_read_header_finished);
+            m_socket->m_read_body_finished.set_callback(this, &Connection<Id_type>::async_read_body_finished);
+            m_socket->m_write_header_finished.set_callback(this, &Connection<Id_type>::async_write_header_finished);
+            m_socket->m_write_body_finished.set_callback(this, &Connection<Id_type>::async_write_body_finished);
         }
 
         // Updates m_ip member with the current remote ip
@@ -126,7 +116,7 @@ namespace Net
                     std::format("Succesfull handshake with {}", get_ip()), Severity::notification);
 
                 // Starts to wait messages
-                m_socket->async_read_header(&m_received_message.m_header, sizeof(Message_header<Id_type>));
+                m_socket->async_read_header(m_received_message.header_data(), m_received_message.header_size());
 
                 // If received any messages to be sent during the handshake, we send them now
                 start_writing_message();
@@ -138,7 +128,7 @@ namespace Net
         // Checks if the header is in valid format
         [[nodiscard]] bool validate_header(Message_header<Id_type> header) const
         {
-            if (header.m_validation_key != Message_header<Id_type>::CONSTANT_VALIDATION_KEY)
+            if (!header.is_validation_key_correct())
                 return false;
 
             if (header.m_internal_id != Internal_id::not_internal)
@@ -163,22 +153,22 @@ namespace Net
         {
             if (!error)
             {
-                if (!validate_header(m_received_message.m_header))
+                if (!validate_header(m_received_message.get_header()))
                 {
                     disconnect("Header validation failed", true);
                     return;
                 }
 
                 // Don't read body if size of message is 0
-                if (m_received_message.m_header.m_size == 0)
+                if (m_received_message.get_header().m_size == 0)
                 {
                     on_message_received();
-                    m_socket->async_read_header(&m_received_message.m_header, sizeof(Message_header<Id_type>));
+                    m_socket->async_read_header(m_received_message.header_data(), m_received_message.header_size());
                     return;
                 }
 
-                m_received_message.resize_body(m_received_message.m_header.m_size);
-                m_socket->async_read_body(m_received_message.m_body.data(), m_received_message.m_body.size());
+                m_received_message.resize_body(m_received_message.get_header().m_size);
+                m_socket->async_read_body(m_received_message.body_data(), m_received_message.body_size());
             }
             else
                 disconnect(std::format("Read header failed because {}", error.message()), true);
@@ -190,10 +180,15 @@ namespace Net
             if (!error)
             {
                 on_message_received();
-                m_socket->async_read_header(&m_received_message.m_header, sizeof(Message_header<Id_type>));
+                m_socket->async_read_header(m_received_message.header_data(), m_received_message.header_size());
             }
             else
                 disconnect(std::format("Read body failed because {}", error.message()), true);
+        }
+
+        const Message<Id_type>& out_message() noexcept
+        {
+            return m_out_queue.front();
         }
 
         // Starts writing message if possible otherwise does nothing
@@ -202,7 +197,7 @@ namespace Net
             if (!m_out_queue.empty() && !m_is_writing_message && m_has_done_handshake)
             {
                 m_is_writing_message = true;
-                m_socket->async_write_header(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>));
+                m_socket->async_write_header(out_message().header_data(), out_message().header_size());
             }
         }
 
@@ -211,15 +206,15 @@ namespace Net
         {
             if (!error)
             {
-                if (m_out_queue.front().m_header.m_size > 0)
-                    m_socket->async_write_body(m_out_queue.front().m_body.data(), m_out_queue.front().m_body.size());
+                if (out_message().get_header().m_size > 0)
+                    m_socket->async_write_body(out_message().body_data(), out_message().body_size());
 
                 else
                 {
                     m_out_queue.pop_front();
 
                     if (!m_out_queue.empty())
-                        m_socket->async_write_header(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>));
+                        m_socket->async_write_header(out_message().header_data(), out_message().header_size());
                     else
                         m_is_writing_message = false;
                 }
@@ -236,7 +231,7 @@ namespace Net
                 m_out_queue.pop_front();
 
                 if (!m_out_queue.empty())
-                    m_socket->async_write_header(&m_out_queue.front().m_header, sizeof(Message_header<Id_type>));
+                    m_socket->async_write_header(out_message().header_data(), out_message().header_size());
                 else
                     m_is_writing_message = false;
             }

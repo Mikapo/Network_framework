@@ -88,7 +88,7 @@ namespace Net
         *   Sets max allowed connections to server at same time.
         *   This will not disconnect any already connected clients.
         */
-        void set_max_connections(size_t new_max_connections) const noexcept
+        void set_max_connections(size_t new_max_connections) noexcept
         {
             m_max_connections = new_max_connections;
         }
